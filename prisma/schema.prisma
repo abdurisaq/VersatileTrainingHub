@@ -8,13 +8,163 @@ generator client {
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
+    relationMode = "prisma"
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([name])
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  // App-specific relations
+  trainingPacksCreated TrainingPack[] @relation("UserCreations")
+  ratingsGiven         Rating[]
+  commentsMade         Comment[]
+  favoritePacks        UserFavoriteTrainingPack[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- VersatileTraining Application Models ---
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+model TrainingPack {
+  id            String    @id @default(cuid())
+  name          String    @db.VarChar(255)
+  description   String?   @db.Text
+  code          String?   @db.VarChar(50) // Official RL training pack code
+  difficulty    Int?      // 1-5
+  tags          String[]  // e.g., ["aerial", "defense"]
+  totalShots    Int
+
+  // Base64 encoded, compressed metadata of the training pack (from plugin's CustomTrainingData)
+  packMetadataCompressed String @db.Text
+
+  shots         Shot[]    // Individual shots with their recordings
+
+  creatorId     String
+  creator       User      @relation("UserCreations", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  downloadCount Int       @default(0)
+  averageRating Float     @default(0.0)
+  ratingCount   Int       @default(0)
+  ratings       Rating[]
+  comments      Comment[]
+  favoritedBy   UserFavoriteTrainingPack[]
+
+  visibility    Visibility @default(PUBLIC)
+  gameVersion   String?    @db.VarChar(50)
+  pluginVersion String?    @db.VarChar(50) // Your BakkesMod plugin version
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([creatorId])
+  @@index([name])
+  @@index([code])
+  @@index([visibility])
+}
+
+model Shot {
+  id             String @id @default(cuid())
+  trainingPackId String
+  trainingPack   TrainingPack @relation(fields: [trainingPackId], references: [id], onDelete: Cascade)
+  shotIndex      Int    // 0-based index
+
+  // Base64 encoded, compressed recording data for this specific shot (from plugin's ShotRecording)
+  recordingDataCompressed String @db.Text
+
+  @@unique([trainingPackId, shotIndex])
+  @@index([trainingPackId])
+}
+
+model Rating {
+  id             String   @id @default(cuid())
+  value          Int      // 1-5
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingPackId String
+  trainingPack   TrainingPack @relation(fields: [trainingPackId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, trainingPackId])
+  @@index([trainingPackId])
+  @@index([userId])
+}
+
+model Comment {
+  id             String   @id @default(cuid())
+  text           String   @db.Text
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingPackId String
+  trainingPack   TrainingPack @relation(fields: [trainingPackId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         Comment? @relation("Replies", fields: [parentId], references: [id], onDelete:Restrict, onUpdate: Restrict)
+  replies        Comment[] @relation("Replies")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([trainingPackId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model UserFavoriteTrainingPack {
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainingPackId String
+  trainingPack   TrainingPack @relation(fields: [trainingPackId], references: [id], onDelete: Cascade)
+  assignedAt     DateTime     @default(now())
+
+  @@id([userId, trainingPackId])
+  @@index([userId])
+  @@index([trainingPackId])
 }
