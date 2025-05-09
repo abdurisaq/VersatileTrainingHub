@@ -55,32 +55,42 @@ export function usePluginConnection({
     }
   }, [port, authToken]); // Add authToken to dependency array
 
-  // Function to send training pack to plugin
   const sendTrainingPack = useCallback(async (packData: any): Promise<boolean> => {
-    if (!isConnected) return false;
+  if (!isConnected) return false;
 
-    try {
-      // Add headers with auth token if provided
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-      
-      const response = await fetch(`http://localhost:${port}/load-pack`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(packData),
-      });
-      
-      return response.ok;
-    } catch (error) {
-      console.error('Error sending training pack to plugin:', error);
+  try {
+    // Add headers with auth token if provided
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    // Use fetch with explicit CORS settings
+    const response = await fetch(`http://localhost:${port}/load-pack`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(packData),
+      mode: 'cors',
+      credentials: 'omit', // Important for cross-origin requests
+    });
+    
+    if (response.ok) {
+      const text = await response.text();
+      console.log("Success response:", text);
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error(`Error ${response.status}: ${errorText}`);
       return false;
     }
-  }, [isConnected, port, authToken]); // Add authToken to dependency array
+  } catch (error) {
+    console.error('Error sending training pack to plugin:', error);
+    return false;
+  }
+}, [isConnected, port, authToken]);
 
   // Rest of your hook implementation remains the same
   useEffect(() => {

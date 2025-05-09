@@ -23,6 +23,7 @@ export default function TrainingPackDetailPage() {
   
   const { isConnected, sendTrainingPack } = usePluginConnection({
     port: 7437, // Your plugin's standard port
+    authToken: "versatile_training_scanner_token",
   });
 
   const handleDownload = async () => {
