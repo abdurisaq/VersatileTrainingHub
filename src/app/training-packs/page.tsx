@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+
 function PackCard({ pack }: { pack: any }) {
   return (
     <div className="border bg-white rounded-lg shadow hover:shadow-md transition-shadow p-4">

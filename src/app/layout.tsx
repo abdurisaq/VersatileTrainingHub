@@ -3,8 +3,10 @@ import { Inter } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { headers } from "next/headers";
 import { getServerAuthSession } from "~/server/auth";
+import type { Session } from "next-auth";
 import { Providers } from "./providers";
 import { UserNav } from "~/app/components/user-nav";
+import { PluginConnectionIndicator } from "./components/plugin-connection-indicator";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,7 +20,7 @@ export const metadata = {
 };
 
 async function NavBar() {
-  const session = await getServerAuthSession();
+  const session = await getServerAuthSession() as Session | null;
   
   return (
     <nav className="bg-gray-800 text-white p-4">
@@ -64,9 +66,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans ${inter.variable} min-h-screen bg-gray-100`}>
         <Providers>
-          <TRPCReactProvider headers={headers()}>
+          <TRPCReactProvider>
             <NavBar />
             <main className="pt-4">{children}</main>
+            <PluginConnectionIndicator />
           </TRPCReactProvider>
         </Providers>
       </body>

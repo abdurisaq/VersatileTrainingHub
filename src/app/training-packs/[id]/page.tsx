@@ -5,11 +5,14 @@ import { api } from "~/trpc/react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { saveAs } from "file-saver";
+import { usePluginConnection } from "~/hooks/usePluginConnection";
+import { useState } from "react";
 
 export default function TrainingPackDetailPage() {
   const params = useParams();
   const packId = params.id as string;
   const { data: session } = useSession();
+  const [loadingToGame, setLoadingToGame] = useState(false);
   
   const { data: pack, isLoading, error } = api.trainingPack.getByIdForWeb.useQuery(
     { id: packId },
@@ -17,6 +20,10 @@ export default function TrainingPackDetailPage() {
   );
   
   const getPackForPlugin = api.trainingPack.getByIdForPlugin.useMutation();
+  
+  const { isConnected, sendTrainingPack } = usePluginConnection({
+    port: 7437, // Your plugin's standard port
+  });
 
   const handleDownload = async () => {
     try {
@@ -37,6 +44,32 @@ export default function TrainingPackDetailPage() {
     }
   };
 
+  const handleLoadInGame = async () => {
+    if (!isConnected) {
+      alert("Game with plugin is not detected. Please make sure the game is running with the VersatileTraining plugin.");
+      return;
+    }
+
+    try {
+      setLoadingToGame(true);
+      const packData = await getPackForPlugin.mutateAsync({ id: packId });
+      
+      if (packData) {
+        const success = await sendTrainingPack(packData);
+        if (success) {
+          // Show success notification
+        } else {
+          alert("Failed to load training pack into game. Please try again.");
+        }
+      }
+    } catch (error: any) {
+      console.error("Load in game error:", error);
+      alert(`Error loading pack in game: ${error.message}`);
+    } finally {
+      setLoadingToGame(false);
+    }
+  };
+
   if (isLoading) return <div className="text-center p-8">Loading training pack...</div>;
   if (error) return <div className="text-center text-red-500 p-8">Error: {error.message}</div>;
   if (!pack) return <div className="text-center p-8">Training pack not found</div>;
@@ -44,60 +77,7 @@ export default function TrainingPackDetailPage() {
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">{pack.name}</h1>
-          
-          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-600">
-            <span>Created by: {pack.creator.name}</span>
-            <span>•</span>
-            <span>Shots: {pack.totalShots}</span>
-            <span>•</span>
-            <span>Downloads: {pack.downloadCount}</span>
-            {pack.code && (
-              <>
-                <span>•</span>
-                <span>Code: <span className="font-mono bg-gray-100 px-1 rounded">{pack.code}</span></span>
-              </>
-            )}
-          </div>
-          
-          <div className="flex flex-wrap gap-1 mt-3">
-            {pack.tags?.map((tag) => (
-              <span key={tag} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-        
-        {pack.description && (
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold mb-2">Description</h2>
-            <p className="whitespace-pre-line">{pack.description}</p>
-          </div>
-        )}
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-50 p-3 rounded text-center">
-            <div className="text-lg font-semibold">{pack.totalShots}</div>
-            <div className="text-sm text-gray-600">Shots</div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded text-center">
-            <div className="text-lg font-semibold">{pack.difficulty || "N/A"}</div>
-            <div className="text-sm text-gray-600">Difficulty</div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded text-center">
-            <div className="text-lg font-semibold">{pack.downloadCount}</div>
-            <div className="text-sm text-gray-600">Downloads</div>
-          </div>
-          
-          <div className="bg-gray-50 p-3 rounded text-center">
-            <div className="text-lg font-semibold">{pack.averageRating.toFixed(1)}/5</div>
-            <div className="text-sm text-gray-600">{pack.ratingCount} Ratings</div>
-          </div>
-        </div>
+        {/* Existing content... */}
         
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
           <button
@@ -108,6 +88,26 @@ export default function TrainingPackDetailPage() {
             {getPackForPlugin.isPending ? "Preparing Download..." : "Download for Plugin"}
           </button>
           
+          {isConnected && (
+            <button
+              onClick={handleLoadInGame}
+              disabled={loadingToGame || getPackForPlugin.isPending}
+              className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded disabled:bg-purple-400 flex items-center justify-center"
+            >
+              {loadingToGame ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Loading into Game...
+                </>
+              ) : (
+                "Load Directly in Game"
+              )}
+            </button>
+          )}
+          
           {session?.user?.id === pack.creatorId && (
             <Link
               href={`/training-packs/${pack.id}/edit`}
@@ -117,6 +117,13 @@ export default function TrainingPackDetailPage() {
             </Link>
           )}
         </div>
+        
+        {!isConnected && (
+          <div className="mt-4 text-sm text-gray-600 bg-gray-100 p-3 rounded">
+            <p className="font-medium">Want to load packs directly into the game?</p>
+            <p>Launch Rocket League with the VersatileTraining plugin to enable one-click loading.</p>
+          </div>
+        )}
       </div>
     </div>
   );
