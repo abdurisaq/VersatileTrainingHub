@@ -12,6 +12,11 @@ interface PluginConnection {
   isConnected: boolean;
   sendTrainingPack: (packData: any) => Promise<boolean>;
   status: 'scanning' | 'connected' | 'disconnected';
+  getLocalPacks: () => Promise<Array<{
+    id: string;
+    name: string;
+    numShots: number;
+  }> | null>;
 }
 
 export function usePluginConnection({
@@ -112,9 +117,32 @@ export function usePluginConnection({
     };
   }, [checkPort, isConnected, onConnect, onDisconnect, scanInterval]);
 
+  const getLocalPacks = useCallback(async () => {
+    if (!isConnected) return null;
+
+    try {
+      const headers: HeadersInit = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(`http://localhost:${port}/list-packs`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.packs;
+    } catch (error) {
+      console.error('Error getting local packs:', error);
+      return null;
+    }
+  }, [isConnected, port, authToken]);
   return {
     isConnected,
     sendTrainingPack,
     status,
+    getLocalPacks,
   };
 }

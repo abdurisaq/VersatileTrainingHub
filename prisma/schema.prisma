@@ -85,8 +85,7 @@ model TrainingPack {
 
   // Base64 encoded, compressed metadata of the training pack (from plugin's CustomTrainingData)
   packMetadataCompressed String @db.Text
-
-  shots         Shot[]    // Individual shots with their recordings
+  recordingDataCompressed String?    @db.Text
 
   creatorId     String
   creator       User      @relation("UserCreations", fields: [creatorId], references: [id], onDelete: Cascade)
@@ -111,18 +110,6 @@ model TrainingPack {
   @@index([visibility])
 }
 
-model Shot {
-  id             String @id @default(cuid())
-  trainingPackId String
-  trainingPack   TrainingPack @relation(fields: [trainingPackId], references: [id], onDelete: Cascade)
-  shotIndex      Int    // 0-based index
-
-  // Base64 encoded, compressed recording data for this specific shot (from plugin's ShotRecording)
-  recordingDataCompressed String @db.Text
-
-  @@unique([trainingPackId, shotIndex])
-  @@index([trainingPackId])
-}
 
 model Rating {
   id             String   @id @default(cuid())

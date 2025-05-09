@@ -21,7 +21,8 @@ const createTrainingPackInputSchema = z.object({
   difficulty: z.number().int().min(1).max(5).optional().nullable(),
   tags: z.array(z.string().max(30)).max(10).optional().default([]),
   packMetadataCompressed: z.string().min(1, "Pack metadata is required (Base64)"),
-  shots: z.array(shotInputSchema).min(1, "At least one shot is required").max(100),
+  recordingDataCompressed: z.string().optional().default(""), // New field for all recordings
+  totalShots: z.number().int().min(1, "At least one shot is required").max(100),
   visibility: z.nativeEnum(Visibility).default(Visibility.PUBLIC),
   gameVersion: z.string().max(50).optional().nullable(),
   pluginVersion: z.string().max(50).optional().nullable(),
@@ -34,14 +35,24 @@ export const trainingPackRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Basic check for base64 data
       const isBase64 = (str: string) => /^[A-Za-z0-9+/]+={0,2}$/.test(str);
-      if (!isBase64(input.packMetadataCompressed) || 
-          !input.shots.every(s => isBase64(s.recordingDataCompressed))) {
+      
+      // Validate only the packMetadataCompressed - no more shots array
+      if (!isBase64(input.packMetadataCompressed)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Invalid Base64 data provided',
+          message: 'Invalid Base64 data provided for pack metadata',
         });
       }
 
+      // Optional validation for recording data if present
+      // if (input.recordingDataCompressed && !isBase64(input.recordingDataCompressed)) {
+      //   throw new TRPCError({
+      //     code: 'BAD_REQUEST',
+      //     message: 'Invalid Base64 data provided for recordings',
+      //   });
+      // }
+
+      // First, create the training pack
       const newTrainingPack = await ctx.db.trainingPack.create({
         data: {
           name: input.name,
@@ -49,18 +60,13 @@ export const trainingPackRouter = createTRPCRouter({
           code: input.code,
           difficulty: input.difficulty,
           tags: input.tags,
-          totalShots: input.shots.length,
+          totalShots: input.totalShots,
           packMetadataCompressed: input.packMetadataCompressed,
-          creatorId: ctx.session.user.id,
+          recordingDataCompressed: input.recordingDataCompressed,
+          creatorId: ctx.session.user.id, // This should work with protectedProcedure
           visibility: input.visibility,
           gameVersion: input.gameVersion,
           pluginVersion: input.pluginVersion,
-          shots: {
-            create: input.shots.map(shot => ({
-              shotIndex: shot.shotIndex,
-              recordingDataCompressed: shot.recordingDataCompressed,
-            })),
-          },
         },
         include: {
           creator: {
@@ -121,65 +127,78 @@ export const trainingPackRouter = createTRPCRouter({
         });
       }
 
-      // Handle visibility restrictions
-      if (pack.visibility === Visibility.PRIVATE &&
-          pack.creatorId !== ctx.session?.user?.id) {
+      function getUserId(ctx: any): string | null {
+  return ctx.session?.user?.id || null;
+}
+
+    if (pack.visibility === Visibility.PRIVATE && 
+      (getUserId(ctx) === null || pack.creatorId !== getUserId(ctx))) {
         throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'This pack is private',
-        });
-      }
+      code: 'FORBIDDEN',
+      message: 'This pack is private',
+      });
+    }
 
       return pack;
     }),
 
   // Get complete training pack data for plugin download
   getByIdForPlugin: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const pack = await ctx.db.trainingPack.findUnique({
-        where: { id: input.id },
-        include: {
-          creator: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          shots: {
-            orderBy: { shotIndex: 'asc' },
-            select: {
-              shotIndex: true,
-              recordingDataCompressed: true,
-            },
+  .input(z.object({ id: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    const pack = await ctx.db.trainingPack.findUnique({
+      where: { id: input.id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        code: true,
+        difficulty: true,
+        tags: true,
+        totalShots: true,
+        packMetadataCompressed: true,
+        recordingDataCompressed: true,
+        visibility: true,
+        gameVersion: true,
+        pluginVersion: true,
+        createdAt: true,
+        updatedAt: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
           },
         },
+      },
+    });
+
+    if (!pack) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Training pack not found',
       });
+    }
 
-      if (!pack) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Training pack not found',
-        });
-      }
+    function getUserId(ctx: any): string | null {
+      return ctx.session?.user?.id || null;
+    }
 
-      // Handle visibility restrictions
-      if (pack.visibility === Visibility.PRIVATE &&
-          pack.creatorId !== ctx.session?.user?.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'This pack is private',
-        });
-      }
-
-      // Increment download count
-      await ctx.db.trainingPack.update({
-        where: { id: input.id },
-        data: { downloadCount: { increment: 1 } },
+    if (pack.visibility === Visibility.PRIVATE && 
+      (getUserId(ctx) === null || pack.creator.id !== getUserId(ctx))) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'This pack is private',
       });
+    }
 
-      return pack;
-    }),
+    // Increment download count
+    await ctx.db.trainingPack.update({
+      where: { id: input.id },
+      data: { downloadCount: { increment: 1 } },
+    });
+
+    return pack;
+  }),
 
   // List public training packs
   listPublic: publicProcedure

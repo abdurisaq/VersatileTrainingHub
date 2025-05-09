@@ -6,39 +6,49 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-
+import { type Session } from "next-auth";
 import { db } from "~/server/db";
+import { getServerAuthSession } from "~/server/auth";
 
-/**
- * 1. CONTEXT
- *
- * This section defines the "contexts" that are available in the backend API.
- *
- * These allow you to access things when processing a request, like the database, the session, etc.
- *
- * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
- * wrap this and provides the required context.
- *
- * @see https://trpc.io/docs/server/context
- */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+// Define what your session user looks like
+export interface SessionUser {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+}
+
+// Define the session type explicitly
+export type AuthSession = Session & { 
+  user: SessionUser 
+};
+
+export interface CreateContextOptions {
+  headers: Headers;
+}
+
+export interface Context {
+  db: typeof db;
+  session: AuthSession | null;
+  headers: Headers;
+}
+
+export const createTRPCContext = async (opts: CreateContextOptions): Promise<Context> => {
+  // Cast the session to match your expected type
+  const session = await getServerAuthSession() as AuthSession | null;
+  
   return {
     db,
-    ...opts,
+    session,
+    headers: opts.headers,
   };
 };
 
-/**
- * 2. INITIALIZATION
- *
- * This is where the tRPC API is initialized, connecting the context and transformer. We also parse
- * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
- * errors on the backend.
- */
-const t = initTRPC.context<typeof createTRPCContext>().create({
+// Update your t initialization to use Context explicitly
+const t = initTRPC.context<Context>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -51,6 +61,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
     };
   },
 });
+
 
 /**
  * Create a server-side caller.
@@ -110,13 +121,15 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(({ ctx, next }) => {
-    if (!ctx.session || !ctx.session.user) {
+    if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+    
     return next({
       ctx: {
-        // infers the `session` as non-nullable
-        session: { ...ctx.session, user: ctx.session.user },
+        ...ctx,
+        // Ensure TypeScript knows this is a non-null session with user
+        session: { ...ctx.session, user: ctx.session.user } as Session & { user: SessionUser },
       },
     });
   });
