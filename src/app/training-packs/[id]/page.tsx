@@ -13,7 +13,15 @@ export default function TrainingPackDetailPage() {
   const packId = params.id as string;
   const { data: session } = useSession();
   const [loadingToGame, setLoadingToGame] = useState(false);
-  
+  const [copied, setCopied] = useState(false);
+
+
+  const copyPackId = () => {
+    navigator.clipboard.writeText(packId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+  };
+
   const { data: pack, isLoading, error } = api.trainingPack.getByIdForWeb.useQuery(
     { id: packId },
     { enabled: !!packId }
@@ -31,10 +39,10 @@ export default function TrainingPackDetailPage() {
       const packData = await getPackForPlugin.mutateAsync({ id: packId });
       
       if (packData) {
-        // Format the data as JSON
+        
         const jsonData = JSON.stringify(packData, null, 2);
         
-        // Create a blob and download it
+  
         const blob = new Blob([jsonData], { type: "application/json;charset=utf-8" });
         const safePackName = packData.name.replace(/[^a-z0-9_.-]/gi, "_") || "training_pack";
         saveAs(blob, `${safePackName}.vtp.json`);
@@ -78,7 +86,64 @@ export default function TrainingPackDetailPage() {
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <div className="bg-white rounded-lg shadow-md p-6">
-        {/* Existing content... */}
+        <div className="space-y-4">
+  <h1 className="text-2xl font-bold">{pack.name}</h1>
+
+  <div className="text-gray-700">
+    <p><span className="font-semibold">Creator:</span> {pack.creator.name}</p>
+    <p><span className="font-semibold">Uploaded:</span> {new Date(pack.createdAt).toLocaleDateString()}</p>
+    <p><span className="font-semibold">Last Updated:</span> {new Date(pack.updatedAt).toLocaleDateString()}</p>
+    {pack.code && <p><span className="font-semibold">Official Code:</span> {pack.code}</p>}
+    {pack.gameVersion && <p><span className="font-semibold">Game Version:</span> {pack.gameVersion}</p>}
+    {pack.pluginVersion && <p><span className="font-semibold">Plugin Version:</span> {pack.pluginVersion}</p>}
+  </div>
+
+  {pack.description && (
+    <div>
+      <h2 className="text-lg font-semibold">Description</h2>
+      <p className="text-gray-800">{pack.description}</p>
+    </div>
+  )}
+
+  <div>
+    <h2 className="text-lg font-semibold">Tags</h2>
+    <div className="flex flex-wrap gap-2">
+      {pack.tags.map((tag) => (
+        <span
+          key={tag}
+          className="bg-blue-100 text-blue-800 px-2 py-1 text-sm rounded"
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  <div className="text-gray-700">
+    <p><span className="font-semibold">Difficulty:</span> {pack.difficulty ?? "Unrated"}</p>
+    <p><span className="font-semibold">Total Shots:</span> {pack.totalShots}</p>
+    <p><span className="font-semibold">Visibility:</span> {pack.visibility}</p>
+    <p><span className="font-semibold">Downloads:</span> {pack.downloadCount}</p>
+    <p><span className="font-semibold">Average Rating:</span> {pack.ratingCount > 0 ? `${pack.averageRating.toFixed(2)} (${pack.ratingCount} ratings)` : "Not yet rated"}</p>
+      <div className="flex items-center gap-2 mt-1">
+    <span className="font-semibold">Pack ID:</span>
+    <code className="bg-gray-100 px-2 py-0.5 rounded text-sm">{pack.id}</code>
+    <button 
+      onClick={copyPackId}
+      className="text-blue-500 text-sm hover:text-blue-700 focus:outline-none"
+      title="Copy ID to clipboard"
+    >
+      {copied ? (
+        <span className="text-green-500">✓ Copied!</span>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+        </svg>
+      )}
+    </button>
+  </div>
+  </div>
+</div>
         
         <div className="flex flex-col sm:flex-row gap-3 mt-6">
           <button

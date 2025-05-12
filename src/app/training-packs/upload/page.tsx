@@ -68,12 +68,37 @@ export default function UploadTrainingPackPage() {
     return <div className="text-center p-8">Loading...</div>;
   }
 
+
+  const handlePackSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const packId = e.target.value;
+  setSelectedLocalPack(packId);
+  
+  // If a pack is selected, auto-fill the name
+  if (packId) {
+    const selectedPack = localPacks.find(pack => pack.id === packId);
+    if (selectedPack) {
+      // Auto-fill the name field with the pack name
+      setFormData(prev => ({
+        ...prev,
+        name: selectedPack.name,
+        code: selectedPack.id
+      }));
+    }
+  } else {
+   
+    setFormData(prev => ({
+      ...prev, 
+      name: ""
+    }));
+  }
+};
+
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+) => {
+  const { name, value } = e.target;
+  setFormData((prev) => ({ ...prev, [name]: value }));
+};
 
   const handleTagChange = (index: number, value: string) => {
     setFormData((prev) => {
@@ -206,7 +231,7 @@ export default function UploadTrainingPackPage() {
             <label className="block text-sm font-medium mb-1">Select Training Pack</label>
             <select
               value={selectedLocalPack}
-              onChange={(e) => setSelectedLocalPack(e.target.value)}
+              onChange={handlePackSelection}//(e) => setSelectedLocalPack(e.target.value)
               className="w-full border rounded-md p-2"
               required
             >
@@ -230,7 +255,13 @@ export default function UploadTrainingPackPage() {
               required
               minLength={3}
               maxLength={100}
+              readOnly={!!selectedLocalPack}
             />
+            {selectedLocalPack && (
+              <p className="text-xs text-gray-500 mt-1">
+                Name is automatically set to match the selected training pack
+              </p>
+            )}
           </div>
           
           <div>
@@ -246,7 +277,7 @@ export default function UploadTrainingPackPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1">Official Training Pack Code (Optional)</label>
+            <label className="block text-sm font-medium mb-1">Official Training Pack Code</label>
             <input
               type="text"
               name="code"
@@ -254,7 +285,13 @@ export default function UploadTrainingPackPage() {
               onChange={handleInputChange}
               className="w-full border rounded-md p-2"
               maxLength={50}
+              readOnly={!!selectedLocalPack}
             />
+            {selectedLocalPack && (
+              <p className="text-xs text-gray-500 mt-1">
+                code is automatically set to match the selected training pack
+              </p>
+            )}
           </div>
           
           <div>
