@@ -128,77 +128,77 @@ export const trainingPackRouter = createTRPCRouter({
       }
 
       function getUserId(ctx: any): string | null {
-  return ctx.session?.user?.id || null;
-}
+        return ctx.session?.user?.id || null;
+      }
 
-    if (pack.visibility === Visibility.PRIVATE && 
-      (getUserId(ctx) === null || pack.creatorId !== getUserId(ctx))) {
-        throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'This pack is private',
-      });
-    }
+      if (pack.visibility === Visibility.PRIVATE && 
+        (getUserId(ctx) === null || pack.creatorId !== getUserId(ctx))) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This pack is private',
+          });
+      }
 
       return pack;
     }),
 
   // Get complete training pack data for plugin download
   getByIdForPlugin: publicProcedure
-  .input(z.object({ id: z.string() }))
-  .mutation(async ({ ctx, input }) => {
-    const pack = await ctx.db.trainingPack.findUnique({
-      where: { id: input.id },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        code: true,
-        difficulty: true,
-        tags: true,
-        totalShots: true,
-        packMetadataCompressed: true,
-        recordingDataCompressed: true,
-        visibility: true,
-        gameVersion: true,
-        pluginVersion: true,
-        createdAt: true,
-        updatedAt: true,
-        creator: {
-          select: {
-            id: true,
-            name: true,
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          code: true,
+          difficulty: true,
+          tags: true,
+          totalShots: true,
+          packMetadataCompressed: true,
+          recordingDataCompressed: true,
+          visibility: true,
+          gameVersion: true,
+          pluginVersion: true,
+          createdAt: true,
+          updatedAt: true,
+          creator: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-      },
-    });
-
-    if (!pack) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Training pack not found',
       });
-    }
 
-    function getUserId(ctx: any): string | null {
-      return ctx.session?.user?.id || null;
-    }
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
 
-    if (pack.visibility === Visibility.PRIVATE && 
-      (getUserId(ctx) === null || pack.creator.id !== getUserId(ctx))) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'This pack is private',
+      function getUserId(ctx: any): string | null {
+        return ctx.session?.user?.id || null;
+      }
+
+      if (pack.visibility === Visibility.PRIVATE && 
+        (getUserId(ctx) === null || pack.creator.id !== getUserId(ctx))) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This pack is private',
+        });
+      }
+
+      // Increment download count
+      await ctx.db.trainingPack.update({
+        where: { id: input.id },
+        data: { downloadCount: { increment: 1 } },
       });
-    }
 
-    // Increment download count
-    await ctx.db.trainingPack.update({
-      where: { id: input.id },
-      data: { downloadCount: { increment: 1 } },
-    });
-
-    return pack;
-  }),
+      return pack;
+    }),
 
   // List public training packs
   listPublic: publicProcedure
@@ -262,5 +262,270 @@ export const trainingPackRouter = createTRPCRouter({
       }
       
       return { items, nextCursor };
+    }),
+
+  // Get all packs created by the current user
+  getUserPacks: protectedProcedure
+    .query(async ({ ctx }) => {
+      const packs = await ctx.db.trainingPack.findMany({
+        where: {
+          creatorId: ctx.session.user.id,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          totalShots: true,
+          tags: true,
+          visibility: true,
+          downloadCount: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      
+      return packs;
+    }),
+
+  // Delete a training pack
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: { creatorId: true },
+      });
+      
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+      
+      if (pack.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only delete your own training packs',
+        });
+      }
+      
+      await ctx.db.trainingPack.delete({
+        where: { id: input.id },
+      });
+      
+      return { success: true };
+    }),
+
+  // Update pack visibility
+  updateVisibility: protectedProcedure
+    .input(z.object({ 
+      id: z.string(),
+      visibility: z.enum(['PUBLIC', 'PRIVATE', 'UNLISTED']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: { creatorId: true },
+      });
+      
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+      
+      if (pack.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only update your own training packs',
+        });
+      }
+      
+      await ctx.db.trainingPack.update({
+        where: { id: input.id },
+        data: { visibility: input.visibility },
+      });
+      
+      return { success: true };
+    }),
+
+  // Get pack data for editing
+  getByIdForEdit: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          code: true,
+          difficulty: true,
+          tags: true,
+          totalShots: true,
+          visibility: true,
+          creatorId: true,
+        },
+      });
+      
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+      
+      if (pack.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only edit your own training packs',
+        });
+      }
+      
+      return pack;
+    }),
+
+  // Update pack with new data from plugin
+  updateWithData: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      packMetadataCompressed: z.string().min(1, "Pack metadata is required"),
+      recordingDataCompressed: z.string().optional().default(""),
+      totalShots: z.number().int().min(1).max(100),
+      name: z.string().min(3).max(100),
+      description: z.string().max(2000).optional().nullable(),
+      tags: z.array(z.string()).optional(),
+      difficulty: z.number().int().min(1).max(5).optional(),
+      visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: { creatorId: true },
+      });
+      
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+      
+      if (pack.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only update your own training packs',
+        });
+      }
+      
+      const updatedPack = await ctx.db.trainingPack.update({
+        where: { id: input.id },
+        data: {
+          packMetadataCompressed: input.packMetadataCompressed,
+          recordingDataCompressed: input.recordingDataCompressed,
+          totalShots: input.totalShots,
+          name: input.name,
+          description: input.description,
+          tags: input.tags,
+          difficulty: input.difficulty,
+          visibility: input.visibility,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+      
+      return updatedPack;
+    }),
+
+  // Update pack details
+  updateDetails: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(3, "Name must be at least 3 characters").max(100, "Name too long"),
+      description: z.string().max(2000, "Description too long").optional().nullable(),
+      code: z.string().max(50, "Pack code too long").optional().nullable(),
+      difficulty: z.number().int().min(1).max(5).optional(),
+      tags: z.array(z.string().max(30)).max(10).optional(),
+      visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: { creatorId: true },
+      });
+      
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+      
+      if (pack.creatorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only update your own training packs',
+        });
+      }
+      
+      const updatedPack = await ctx.db.trainingPack.update({
+        where: { id: input.id },
+        data: {
+          name: input.name,
+          description: input.description,
+          code: input.code,
+          difficulty: input.difficulty,
+          tags: input.tags,
+          visibility: input.visibility,
+          updatedAt: new Date(),
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+      
+      return updatedPack;
+    }),
+    getPackWithMetadata: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const pack = await ctx.db.trainingPack.findUnique({
+        where: { id: input.id },
+        select: {
+          id: true,
+          name: true,
+          packMetadataCompressed: true,
+          visibility: true,
+          creatorId: true,
+        },
+      });
+
+      if (!pack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Training pack not found',
+        });
+      }
+
+      function getUserId(ctx: any): string | null {
+        return ctx.session?.user?.id || null;
+      }
+
+      if (pack.visibility === Visibility.PRIVATE && 
+        (getUserId(ctx) === null || pack.creatorId !== getUserId(ctx))) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'This pack is private',
+          });
+      }
+
+      return pack;
     }),
 });
