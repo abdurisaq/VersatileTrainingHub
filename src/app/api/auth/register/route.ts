@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { db } from "~/server/db";
 import { hash } from "bcryptjs";
 import { z } from "zod";
@@ -12,10 +13,10 @@ const userSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    
-    // Validate input
-    const validatedData = userSchema.safeParse(body);
+
+    const rawBody: unknown = await req.json();
+
+    const validatedData = userSchema.safeParse(rawBody);
     if (!validatedData.success) {
       return NextResponse.json(
         { error: "Invalid input", details: validatedData.error.format() },

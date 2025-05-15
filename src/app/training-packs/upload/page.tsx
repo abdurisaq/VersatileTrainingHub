@@ -12,8 +12,14 @@ interface LocalPack {
   numShots: number;
 }
 
+interface PluginPackData {
+  trainingData: string;
+  shotsRecording?: string;
+  numShots?: number;
+}
+
 export default function UploadTrainingPackPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   
   const [localPacks, setLocalPacks] = useState<LocalPack[]>([]);
@@ -44,7 +50,7 @@ export default function UploadTrainingPackPage() {
       }
     };
 
-    loadLocalPacks();
+    void loadLocalPacks();
   }, [isConnected, getLocalPacks]);
 
   const createTrainingPack = api.trainingPack.create.useMutation({
@@ -60,7 +66,7 @@ export default function UploadTrainingPackPage() {
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
-    router.push("/api/auth/signin");
+    void router.push("/api/auth/signin");
     return null;
   }
 
@@ -68,37 +74,35 @@ export default function UploadTrainingPackPage() {
     return <div className="text-center p-8">Loading...</div>;
   }
 
-
   const handlePackSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  const packId = e.target.value;
-  setSelectedLocalPack(packId);
-  
-  // If a pack is selected, auto-fill the name
-  if (packId) {
-    const selectedPack = localPacks.find(pack => pack.id === packId);
-    if (selectedPack) {
-      // Auto-fill the name field with the pack name
+    const packId = e.target.value;
+    setSelectedLocalPack(packId);
+    
+    // If a pack is selected, auto-fill the name
+    if (packId) {
+      const selectedPack = localPacks.find(pack => pack.id === packId);
+      if (selectedPack) {
+        // Auto-fill the name field with the pack name
+        setFormData(prev => ({
+          ...prev,
+          name: selectedPack.name,
+          code: selectedPack.id
+        }));
+      }
+    } else {
       setFormData(prev => ({
-        ...prev,
-        name: selectedPack.name,
-        code: selectedPack.id
+        ...prev, 
+        name: ""
       }));
     }
-  } else {
-   
-    setFormData(prev => ({
-      ...prev, 
-      name: ""
-    }));
-  }
-};
+  };
 
   const handleInputChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-) => {
-  const { name, value } = e.target;
-  setFormData((prev) => ({ ...prev, [name]: value }));
-};
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleTagChange = (index: number, value: string) => {
     setFormData((prev) => {
@@ -123,90 +127,90 @@ export default function UploadTrainingPackPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!selectedLocalPack) {
-    setErrorMessage("Please select a training pack");
-    return;
-  }
-
-  setIsLoading(true);
-  setErrorMessage("");
-
-  try {
-    const selectedPack = localPacks.find(pack => pack.id === selectedLocalPack);
-    
-    if (!selectedPack) {
-      throw new Error("Selected pack not found");
+    e.preventDefault();
+    if (!selectedLocalPack) {
+      setErrorMessage("Please select a training pack");
+      return;
     }
 
-    console.log("Fetching pack data for:", selectedPack.id);
-    
-    // First check if plugin is connected
-    if (!isConnected) {
-      throw new Error("Plugin connection lost. Please ensure Rocket League is running with the VersatileTraining plugin.");
-    }
-    
-    // Make a single request to get both pack and recording data
-    const response = await fetch(`http://localhost:7437/pack-recording/${selectedPack.id}`, {
-      headers: {
-        'Authorization': `Bearer versatile_training_scanner_token`
-      }
-    }).catch(err => {
-      console.error("Network error when contacting plugin:", err);
-      throw new Error("Could not connect to the plugin. Is Rocket League running?");
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Plugin returned status ${response.status}: ${errorText}`);
-      throw new Error(`Plugin returned error ${response.status}: ${errorText}`);
-    }
-    
-    // Get text response first to sanitize it before parsing as JSON
-    const responseText = await response.text();
-    
-    // Sanitize the JSON by removing invalid control characters
-    const sanitizedText = responseText.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-    
-    let packData;
+    setIsLoading(true);
+    setErrorMessage("");
+
     try {
-      packData = JSON.parse(sanitizedText);
-    } catch (parseError) {
-      console.error("Failed to parse JSON:", parseError);
-      console.log("Response data:", sanitizedText.substring(0, 200) + "..."); // Log a preview
-      throw new Error("Invalid response from plugin. The data format is incorrect.");
-    }
-    
-    console.log("Received pack data with size:", 
-      packData.trainingData?.length || 0, 
-      "bytes and recording size:", 
-      packData.shotsRecording?.length || 0, "bytes");
-    
-    if (!packData.trainingData) {
-      throw new Error("Missing training data in plugin response");
-    }
+      const selectedPack = localPacks.find(pack => pack.id === selectedLocalPack);
+      
+      if (!selectedPack) {
+        throw new Error("Selected pack not found");
+      }
 
-    // Rest of your code remains the same
-    const data = {
-      name: formData.name || selectedPack.name,
-      description: formData.description || null,
-      code: formData.code || null,
-      difficulty: parseInt(formData.difficulty.toString()),
-      tags: formData.tags.filter(tag => tag.trim() !== ""),
-      visibility: formData.visibility as "PUBLIC" | "PRIVATE" | "UNLISTED",
-      packMetadataCompressed: packData.trainingData,
-      recordingDataCompressed: packData.shotsRecording || "", 
-      totalShots: selectedPack.numShots,
-    };
+      console.log("Fetching pack data for:", selectedPack.id);
+      
+      // First check if plugin is connected
+      if (!isConnected) {
+        throw new Error("Plugin connection lost. Please ensure Rocket League is running with the VersatileTraining plugin.");
+      }
+      
+      // Make a single request to get both pack and recording data
+      const response = await fetch(`http://localhost:7437/pack-recording/${selectedPack.id}`, {
+        headers: {
+          'Authorization': `Bearer versatile_training_scanner_token`
+        }
+      }).catch(err => {
+        console.error("Network error when contacting plugin:", err);
+        throw new Error("Could not connect to the plugin. Is Rocket League running?");
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Plugin returned status ${response.status}: ${errorText}`);
+        throw new Error(`Plugin returned error ${response.status}: ${errorText}`);
+      }
+      
+      // Get text response first to sanitize it before parsing as JSON
+      const responseText = await response.text();
+      
+      // Sanitize the JSON by removing invalid control characters
+      const sanitizedText = responseText.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      
+      let packData: PluginPackData;
+      try {
+        packData = JSON.parse(sanitizedText) as PluginPackData;
+      } catch (parseError) {
+        console.error("Failed to parse JSON:", parseError);
+        console.log("Response data:", sanitizedText.substring(0, 200) + "..."); // Log a preview
+        throw new Error("Invalid response from plugin. The data format is incorrect.");
+      }
+      
+      console.log("Received pack data with size:", 
+        packData.trainingData?.length ?? 0, 
+        "bytes and recording size:", 
+        packData.shotsRecording?.length ?? 0, "bytes");
+      
+      if (!packData.trainingData) {
+        throw new Error("Missing training data in plugin response");
+      }
 
-    // Submit to API
-    createTrainingPack.mutate(data);
-  } catch (error) {
-    setIsLoading(false);
-    setErrorMessage("Error preparing pack data: " + (error instanceof Error ? error.message : String(error)));
-    console.error("Error processing pack:", error);
-  }
-};
+      // Rest of your code remains the same
+      const data = {
+        name: formData.name || selectedPack.name,
+        description: formData.description || null,
+        code: formData.code || null,
+        difficulty: parseInt(formData.difficulty.toString()),
+        tags: formData.tags.filter(tag => tag.trim() !== ""),
+        visibility: formData.visibility as "PUBLIC" | "PRIVATE" | "UNLISTED",
+        packMetadataCompressed: packData.trainingData,
+        recordingDataCompressed: packData.shotsRecording ?? "", 
+        totalShots: selectedPack.numShots,
+      };
+
+      // Submit to API
+      createTrainingPack.mutate(data);
+    } catch (error) {
+      setIsLoading(false);
+      setErrorMessage("Error preparing pack data: " + (error instanceof Error ? error.message : String(error)));
+      console.error("Error processing pack:", error);
+    }
+  };
 
   return (
     <div className="container mx-auto p-4 max-w-3xl">
@@ -231,7 +235,7 @@ export default function UploadTrainingPackPage() {
             <label className="block text-sm font-medium mb-1">Select Training Pack</label>
             <select
               value={selectedLocalPack}
-              onChange={handlePackSelection}//(e) => setSelectedLocalPack(e.target.value)
+              onChange={handlePackSelection}
               className="w-full border rounded-md p-2"
               required
             >

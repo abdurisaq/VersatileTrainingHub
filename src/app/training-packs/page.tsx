@@ -46,7 +46,7 @@ function PackCard({ pack }: { pack: Pack }) {
       {pack.code && <p className="text-sm text-gray-500">Code: {pack.code}</p>}
       
       <div className="flex items-center gap-2 mt-1 text-sm text-gray-700">
-        <span>By: {pack.creator?.name || "Unknown"}</span>
+        <span>By: {pack.creator?.name ?? "Unknown"}</span>
         <span className="text-gray-300">|</span>
         <span>Shots: {pack.totalShots}</span>
         <span className="text-gray-300">|</span>
@@ -119,7 +119,7 @@ export default function TrainingPacksPage() {
         if (activeSearchField === "tags" && pack.tags?.some(tag => tag.toLowerCase().includes(lowerSearchTerm))) {
           return true;
         }
-        if (activeSearchField === "creator" && pack.creator?.name && pack.creator.name.toLowerCase().includes(lowerSearchTerm)) {
+        if (activeSearchField === "creator" && pack.creator?.name?.toLowerCase().includes(lowerSearchTerm)) {
           return true;
         }
         return false;
@@ -127,9 +127,9 @@ export default function TrainingPacksPage() {
     }
 
     packsToDisplay.sort((a, b) => {
-      let compareA: any;
-      let compareB: any;
-
+      let compareA: string | number | undefined;
+      let compareB: string | number | undefined;
+      
       switch (sortBy) {
         case "name":
           compareA = a.name?.toLowerCase() || "";

@@ -5,18 +5,14 @@ import {
   protectedProcedure,
 } from "../trpc";
 import { TRPCError } from '@trpc/server';
-import { Prisma,Visibility } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import { Visibility } from '@prisma/client';
 
 
-const shotInputSchema = z.object({
-  shotIndex: z.number().int().min(0),
-  recordingDataCompressed: z.string().min(1, "Recording data is required"),
-});
 
 const getUserId = (ctx: { session?: { user?: { id?: string | null } | null } | null }): string | null => {
   return ctx.session?.user?.id ?? null;
 };
-
 
 const createTrainingPackInputSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(100, "Name too long"),
@@ -28,7 +24,6 @@ const createTrainingPackInputSchema = z.object({
   recordingDataCompressed: z.string().optional().default(""), // New field for all recordings
   totalShots: z.number().int().min(1, "At least one shot is required").max(100),
   visibility: z.nativeEnum(Visibility).default(Visibility.PUBLIC),
-  
 });
 
 export const trainingPackRouter = createTRPCRouter({
@@ -293,7 +288,7 @@ export const trainingPackRouter = createTRPCRouter({
           text,
           userId,
           trainingPackId,
-          parentId: parentId || undefined, 
+          parentId: parentId ?? undefined, // Changed || to ??
         },
         
         select: {
@@ -303,7 +298,6 @@ export const trainingPackRouter = createTRPCRouter({
             updatedAt: true,
             parentId: true,
             user: { select: { id: true, name: true, image: true } },
-            
         }
       });
       return comment;
@@ -347,59 +341,56 @@ export const trainingPackRouter = createTRPCRouter({
 
   
   getByIdForPlugin: publicProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const pack = await ctx.db.trainingPack.findUnique({
-        where: { id: input.id },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          code: true,
-          difficulty: true,
-          tags: true,
-          totalShots: true,
-          packMetadataCompressed: true,
-          recordingDataCompressed: true,
-          visibility: true,
-          createdAt: true,
-          updatedAt: true,
-          creator: {
-            select: {
-              id: true,
-              name: true,
-            },
+  .input(z.object({ id: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    const pack = await ctx.db.trainingPack.findUnique({
+      where: { id: input.id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        code: true,
+        difficulty: true,
+        tags: true,
+        totalShots: true,
+        packMetadataCompressed: true,
+        recordingDataCompressed: true,
+        visibility: true,
+        createdAt: true,
+        updatedAt: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
           },
         },
+      },
+    });
+
+    if (!pack) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Training pack not found',
       });
+    }
 
-      if (!pack) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Training pack not found',
-        });
-      }
-
-      function getUserId(ctx: any): string | null {
-        return ctx.session?.user?.id || null;
-      }
-
-      if (pack.visibility === Visibility.PRIVATE && 
-        (getUserId(ctx) === null || pack.creator.id !== getUserId(ctx))) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'This pack is private',
-        });
-      }
-
-      // Increment download count
-      await ctx.db.trainingPack.update({
-        where: { id: input.id },
-        data: { downloadCount: { increment: 1 } },
+    // Use the existing top-level getUserId function instead of defining a new one
+    if (pack.visibility === Visibility.PRIVATE && 
+      (getUserId(ctx) === null || pack.creator.id !== getUserId(ctx))) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'This pack is private',
       });
+    }
 
-      return pack;
-    }),
+    // Increment download count
+    await ctx.db.trainingPack.update({
+      where: { id: input.id },
+      data: { downloadCount: { increment: 1 } },
+    });
+
+    return pack;
+  }),
 
   listPublic: publicProcedure
   .input(z.object({
@@ -723,9 +714,9 @@ export const trainingPackRouter = createTRPCRouter({
         });
       }
 
-      function getUserId(ctx: any): string | null {
-        return ctx.session?.user?.id || null;
-      }
+      const getUserId = (ctx: { session?: { user?: { id?: string | null } | null } | null }): string | null => {
+        return ctx.session?.user?.id ?? null;
+      };
 
       if (pack.visibility === Visibility.PRIVATE && 
         (getUserId(ctx) === null || pack.creatorId !== getUserId(ctx))) {

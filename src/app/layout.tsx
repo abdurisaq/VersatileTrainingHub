@@ -1,12 +1,11 @@
 import "~/styles/globals.css";
 import { Inter } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
-import { headers } from "next/headers";
 import { getServerAuthSession } from "~/server/auth";
-import type { Session } from "next-auth";
 import { Providers } from "./providers";
 import { UserNav } from "~/app/components/user-nav";
 import { PluginConnectionIndicator } from "./components/plugin-connection-indicator";
+import Link from "next/link"; // Add this import
 
 const inter = Inter({
   subsets: ["latin"],
@@ -20,35 +19,39 @@ export const metadata = {
 };
 
 async function NavBar() {
-  const session = await getServerAuthSession() as Session | null;
+  const session = await getServerAuthSession();
   
   return (
     <nav className="bg-gray-800 text-white p-4">
       <div className="container mx-auto flex justify-between items-center">
-        <a href="/" className="text-xl font-bold">
+        
+        <Link href="/" className="text-xl font-bold">
           VersatileTraining Hub
-        </a>
+        </Link>
         
         <div className="flex items-center space-x-6">
-          <a href="/training-packs" className="hover:text-gray-300 py-1 px-3">
+          
+          <Link href="/training-packs" className="hover:text-gray-300 py-1 px-3">
             Browse Packs
-          </a>
+          </Link>
           
           {session ? (
             <>
-              <a href="/training-packs/upload" className="hover:text-gray-300 py-1 px-3">
+              
+              <Link href="/training-packs/upload" className="hover:text-gray-300 py-1 px-3">
                 Upload Pack
-              </a>
+              </Link>
               <UserNav user={session.user} />
             </>
           ) : (
             <div className="flex space-x-4">
-              <a href="/auth/signin" className="hover:text-gray-300 py-1 px-3">
+             
+              <Link href="/auth/signin" className="hover:text-gray-300 py-1 px-3">
                 Sign In
-              </a>
-              <a href="/auth/signup" className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700">
+              </Link>
+              <Link href="/auth/signup" className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700">
                 Sign Up
-              </a>
+              </Link>
             </div>
           )}
         </div>

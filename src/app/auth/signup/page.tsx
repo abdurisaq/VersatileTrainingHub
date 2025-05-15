@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+// Add interface for API response
+interface RegisterResponse {
+  error?: string;
+  success?: boolean;
+}
+
 export default function SignUp() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -24,15 +30,17 @@ export default function SignUp() {
         body: JSON.stringify({ name, email, password }),
       });
       
-      const data = await response.json();
+      
+      const data = await response.json() as RegisterResponse;
       
       if (!response.ok) {
-        setError(data.error || "Something went wrong");
+        
+        setError(data.error ?? "Something went wrong");
         setIsLoading(false);
         return;
       }
       
-      // Redirect to sign-in page after successful registration
+      
       router.push("/auth/signin?registered=true");
     } catch (error) {
       console.error("Registration error:", error);

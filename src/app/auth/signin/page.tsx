@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function SignIn() {
+
+function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -14,7 +15,7 @@ export default function SignIn() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if user was just registered
+  
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
       setSuccessMessage("Account created successfully! Please sign in.");
@@ -105,7 +106,7 @@ export default function SignIn() {
         
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
+            {`Don't have an account?`}{" "}
             <Link href="/auth/signup" className="text-blue-600 hover:underline">
               Sign Up
             </Link>
@@ -119,5 +120,24 @@ export default function SignIn() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SignInFallback() {
+  return (
+    <div className="flex justify-center items-center min-h-[calc(100vh-80px)]">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6 text-center">Sign In</h1>
+        <div className="text-center">Loading...</div>
+      </div>
+    </div>
+  );
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={<SignInFallback />}>
+      <SignInForm />
+    </Suspense>
   );
 }

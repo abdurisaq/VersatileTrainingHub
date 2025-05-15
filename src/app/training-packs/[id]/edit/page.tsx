@@ -51,9 +51,9 @@ export default function EditTrainingPackPage() {
     if (pack) {
       setFormData({
         name: pack.name,
-        description: pack.description || "",
-        code: pack.code || "",
-        difficulty: pack.difficulty || 1,
+        description: pack.description ?? "",
+        code: pack.code ?? "",
+        difficulty: pack.difficulty ?? 1,
         tags: pack.tags.length > 0 ? pack.tags : [""],
         visibility: pack.visibility,
       });
@@ -96,7 +96,7 @@ export default function EditTrainingPackPage() {
         </div>
         {redirecting && (
           <p className="text-sm text-gray-500 mt-8">
-            You'll be automatically redirected in a moment...
+            {`You'll be automatically redirected in a moment...`}
           </p>
         )}
       </div>
@@ -125,7 +125,7 @@ export default function EditTrainingPackPage() {
       <div className="container mx-auto p-4 max-w-3xl">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <p className="font-bold">Unauthorized</p>
-          <p>You don't have permission to edit this training pack.</p>
+          <p>{`You don't have permission to edit this training pack.`}</p>
         </div>
         <p className="text-sm text-gray-500 mt-4">Redirecting to training packs...</p>
       </div>
@@ -138,7 +138,7 @@ export default function EditTrainingPackPage() {
       <div className="container mx-auto p-4 max-w-3xl text-center py-12">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4">
           <p className="font-bold">Training Pack Not Found</p>
-          <p>The training pack you're looking for doesn't exist or has been removed.</p>
+          <p>{`The training pack you're looking for doesn't exist or has been removed.`}</p>
         </div>
         <Link 
           href="/training-packs" 

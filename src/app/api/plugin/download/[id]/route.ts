@@ -1,42 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { createTRPCContext } from "~/server/api/trpc";
 import { appRouter } from "~/server/api/root";
+import { TRPCError } from "@trpc/server";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest) {
   try {
-    const id = params.id;
-    
-    // Create tRPC context and caller
+    const regex = /\/plugin\/download\/(.+)/;
+    const execResult = regex.exec(req.nextUrl.pathname);
+    const id = execResult?.[1];
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing ID parameter" }, { status: 400 });
+    }
+
     const ctx = await createTRPCContext({ headers: req.headers });
     const caller = appRouter.createCaller(ctx);
-
-    // Call the tRPC procedure
     const result = await caller.trainingPack.getByIdForPlugin({ id });
-    
+
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Plugin download error:", error);
-    
-    if (error.code === "NOT_FOUND") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 404 }
-      );
+
+    if (error instanceof TRPCError) {
+      if (error.code === "NOT_FOUND") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+
+      if (error.code === "FORBIDDEN") {
+        return NextResponse.json({ error: error.message }, { status: 403 });
+      }
     }
-    
-    if (error.code === "FORBIDDEN") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: error.message || "Server error" },
-      { status: 500 }
-    );
+
+    const errorMessage = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -1,9 +1,10 @@
-import { type NextAuthConfig } from "next-auth";
+import { type AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { db } from "~/server/db";
 
-export const authConfig: NextAuthConfig = {
+
+export const authConfig: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -66,38 +67,29 @@ export const authConfig: NextAuthConfig = {
     newUser: "/auth/signup" 
   },
   callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.name = user.name;
-        token.email = user.email;
-        token.picture = user.image;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user && token) {
-        session.user.id = token.id as string;
-        session.user.name = token.name as string | null;
-        session.user.email = token.email as string | null;
-        session.user.image = token.picture as string | null;
-      }
-      return session;
-    },
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isProtected = 
-        nextUrl.pathname.startsWith('/profile') || 
-        nextUrl.pathname.startsWith('/training-packs/upload');
-        
-      if (isProtected && !isLoggedIn) {
-        return false;
-      }
-      return true;
-    },
+  jwt({ token, user }) {
+    if (user) {
+      token.id = user.id;
+      token.name = user.name;
+      token.email = user.email;
+      token.picture = user.image;
+    }
+    return token;
   },
+  session({ session, token }) {
+    if (session.user && token) {
+      
+      session.user.id = token.id; 
+      session.user.name = token.name as string | null;
+      session.user.email = token.email as string | null;
+      session.user.image = token.picture as string | null;
+    }
+    return session;
+  }
+},
+  
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, 
   },
 };

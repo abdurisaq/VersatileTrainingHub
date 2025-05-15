@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
@@ -35,20 +35,19 @@ export default function ProfilePage() {
   // Delete pack mutation
   const deletePack = api.trainingPack.delete.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
     },
   });
 
   const updateVisibility = api.trainingPack.updateVisibility.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
     },
   });
 
-
   const toggleFavoriteMutation = api.trainingPack.toggleFavorite.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [["trainingPack", "listUserFavorites"]] });
+      void queryClient.invalidateQueries({ queryKey: [["trainingPack", "listUserFavorites"]] });
     },
   });
 
@@ -76,7 +75,7 @@ export default function ProfilePage() {
   }
   
   if (status === "unauthenticated") {
-    router.push("/api/auth/signin?callbackUrl=/profile");
+    void router.push("/api/auth/signin?callbackUrl=/profile");
     return null;
   }
   
@@ -91,7 +90,7 @@ export default function ProfilePage() {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex items-center space-x-4 mb-6">
           <div className="h-16 w-16 rounded-full bg-gray-300 flex items-center justify-center text-xl">
-            {session.user.name?.[0] || session.user.email?.[0] || "U"}
+            {session.user.name?.[0] ?? session.user.email?.[0] ?? "U"}
           </div>
           <div>
             <h2 className="text-xl font-semibold">{session.user.name}</h2>
@@ -129,7 +128,7 @@ export default function ProfilePage() {
             <div>
               <h3 className="font-medium mb-2">Account Information</h3>
               <p className="text-gray-600 mb-1">User ID: {session.user.id}</p>
-              <p className="text-gray-600">Joined: {new Date(session.user.createdAt || Date.now()).toLocaleDateString()}</p>
+              <p className="text-gray-600">Joined: {new Date(session.user.createdAt ?? Date.now()).toLocaleDateString()}</p>
             </div>
             
             <div className="border-t mt-6 pt-6">
@@ -161,7 +160,7 @@ export default function ProfilePage() {
               <p className="text-gray-500 py-4">Loading your training packs...</p>
             ) : !userPacks || userPacks.length === 0 ? (
               <div className="bg-gray-50 rounded-lg p-8 text-center">
-                <p className="text-gray-500 mb-4">You haven't created any training packs yet.</p>
+                <p className="text-gray-500 mb-4">You haven&apos;t created any training packs yet.</p>
                 <Link
                   href="/training-packs/upload"
                   className="text-blue-600 hover:underline"
@@ -268,7 +267,7 @@ export default function ProfilePage() {
               <p className="text-gray-500 py-4">Loading your favorite packs...</p>
             ) : !favoritePacks || favoritePacks.length === 0 ? (
               <div className="bg-gray-50 rounded-lg p-8 text-center">
-                <p className="text-gray-500 mb-4">You haven't favorited any training packs yet.</p>
+                <p className="text-gray-500 mb-4">You haven&apos;t favorited any training packs yet.</p>
                 <Link
                   href="/training-packs"
                   className="text-blue-600 hover:underline"
@@ -288,7 +287,7 @@ export default function ProfilePage() {
                             {pack.name}
                           </Link>
                           <p className="text-sm text-gray-500">
-                            By {pack.creator?.name || "Unknown"} • {pack.totalShots} shots • {pack.downloadCount} downloads
+                            By {pack.creator?.name ?? "Unknown"} • {pack.totalShots} shots • {pack.downloadCount} downloads
                           </p>
                           {pack.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">

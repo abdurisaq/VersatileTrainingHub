@@ -19,7 +19,7 @@ export function useAuth() {
       return { success: true };
     }
     
-    return { success: false, error: result?.error || "Failed to sign in" };
+    return { success: false, error: result?.error ?? "Failed to sign in" };
   };
 
   const logout = async () => {

@@ -27,7 +27,7 @@ export function UserNav({ user }: { user: User }) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-1 hover:text-gray-300"
       >
-        <span>{user.name || user.email || "User"}</span>
+        <span>{user.name ?? user.email ?? "User"}</span>
         <svg 
           xmlns="http://www.w3.org/2000/svg" 
           className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}

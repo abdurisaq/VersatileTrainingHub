@@ -4,6 +4,13 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
+
+//response
+interface DeleteAccountResponse {
+  error?: string;
+  success?: boolean;
+}
+
 export function DeleteAccountButton({ userId }: { userId: string }) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -32,14 +39,14 @@ export function DeleteAccountButton({ userId }: { userId: string }) {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete account");
+       
+        const data = await response.json() as DeleteAccountResponse;
+        
+        throw new Error(data.error ?? "Failed to delete account");
       }
 
-      // Sign out the user after successful deletion
       await signOut({ redirect: false });
       
-      // Redirect to home page with a message
       router.push("/?deleted=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");

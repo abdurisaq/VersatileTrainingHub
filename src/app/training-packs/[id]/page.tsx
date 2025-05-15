@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { api } from "~/trpc/react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { usePluginConnection } from "~/hooks/usePluginConnection";
 import { useState, useEffect } from "react";
 import type {FormEvent} from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import toast from 'react-hot-toast'; // For notifications
+import toast from 'react-hot-toast'; 
 
 
 interface Vector {
@@ -120,7 +120,7 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     const MAX_REASONABLE_SHOTS = 50; 
     
     const bitstream = base64Decode(base64String);
-    let bitIndex = { value: 0 };
+    const bitIndex = { value: 0 };
 
     const hasCode = readBits(bitstream, bitIndex, TRAINING_CODE_FLAG_BITS) !== 0;
     let code = "";
@@ -152,20 +152,40 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     let name = "";
     for (let i = 0; i < nameLength; i++) name += String.fromCharCode(readBits(bitstream, bitIndex, 7));
     
-    const boostAmounts = new Array(numShots).fill(0);
-    const startingVelocities = new Array(numShots).fill(0);
-    const extendedVelocities: Vector[] = Array.from({ length: numShots }, () => ({ x: 0, y: 0, z: 0 }));
-    const freezeCar = new Array(numShots).fill(false);
-    const hasStartingJump = new Array(numShots).fill(false);
+    const boostAmounts = new Array(numShots).fill(0) as number[];
+    const startingVelocities = new Array(numShots).fill(0) as number[];
+    const extendedVelocities = Array.from({ length: numShots }, () => ({ x: 0, y: 0, z: 0 })) as Vector[];
+    const freezeCar = new Array(numShots).fill(false) as boolean[];
+    const hasStartingJump = new Array(numShots).fill(false) as boolean[];
     
-    numBitsForBoost === 0 ? boostAmounts.fill(minBoost) : decompressIntegers(boostAmounts, minBoost, numBitsForBoost, bitstream, bitIndex);
-    numBitsForVelocity === 0 ? startingVelocities.fill(minVelocity) : decompressIntegers(startingVelocities, minVelocity, numBitsForVelocity, bitstream, bitIndex);
+    if (numBitsForBoost === 0) {
+      boostAmounts.fill(minBoost);
+    } else {
+      decompressIntegers(boostAmounts, minBoost, numBitsForBoost, bitstream, bitIndex);
+    }
+    
+    if (numBitsForVelocity === 0) {
+      startingVelocities.fill(minVelocity);
+    } else {
+      decompressIntegers(startingVelocities, minVelocity, numBitsForVelocity, bitstream, bitIndex);
+    }
+    
     if (maxMagnitude !== 0) decompressVectors(extendedVelocities, maxMagnitude, bitstream, bitIndex);
     
-    const xVals = new Array(numShots * 2).fill(0);
-    const zVals = new Array(numShots * 2).fill(0);
-    numBitsForXBlocker === 0 ? xVals.fill(minGoalBlockX) : decompressIntegers(xVals, minGoalBlockX, numBitsForXBlocker, bitstream, bitIndex);
-    numBitsForZBlocker === 0 ? zVals.fill(minGoalBlockZ) : decompressIntegers(zVals, minGoalBlockZ, numBitsForZBlocker, bitstream, bitIndex);
+    const xVals = new Array(numShots * 2).fill(0) as number[];
+    const zVals = new Array(numShots * 2).fill(0) as number[];
+    
+    if (numBitsForXBlocker === 0) {
+      xVals.fill(minGoalBlockX);
+    } else {
+      decompressIntegers(xVals, minGoalBlockX, numBitsForXBlocker, bitstream, bitIndex);
+    }
+    
+    if (numBitsForZBlocker === 0) {
+      zVals.fill(minGoalBlockZ);
+    } else {
+      decompressIntegers(zVals, minGoalBlockZ, numBitsForZBlocker, bitstream, bitIndex);
+    }
     
     decompressBits(freezeCar, bitstream, bitIndex);
     decompressBits(hasStartingJump, bitstream, bitIndex);
@@ -173,17 +193,20 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     const shotDetails: ShotDetail[] = [];
     for (let i = 0; i < numShots; i++) {
       if (i * 2 + 1 >= xVals.length || i * 2 + 1 >= zVals.length) continue; // Bounds check
-      shotDetails.push({
+      const detail: ShotDetail = {
         boostAmount: boostAmounts[i]!,
         startingVelocity: startingVelocities[i]! - 2000,
         extendedVelocity: extendedVelocities[i]!,
         freezeCar: freezeCar[i]!,
         hasStartingJump: hasStartingJump[i]!,
         goalBlocker: {
-          firstX: xVals[i * 2]! - 910, firstZ: zVals[i * 2]! - 20,
-          secondX: xVals[i * 2 + 1]! - 910, secondZ: zVals[i * 2 + 1]! - 20
+          firstX: xVals[i * 2]! - 910, 
+          firstZ: zVals[i * 2]! - 20,
+          secondX: xVals[i * 2 + 1]! - 910, 
+          secondZ: zVals[i * 2 + 1]! - 20
         }
-      });
+      };
+      shotDetails.push(detail);
     }
     return { name, code, numShots: shotDetails.length, shotDetails };
   } catch (error) {
@@ -204,7 +227,7 @@ const StarRating: React.FC<StarRatingProps> = ({ rating, onRatingChange, readOnl
 
   return (
     <div className="flex items-center">
-      {[...Array(maxStars)].map((_, index) => {
+      {[...Array<number>(maxStars)].map((_, index) => {
         const starValue = index + 1;
         return (
           <button
@@ -236,7 +259,6 @@ export default function TrainingPackDetailPage() {
   const params = useParams();
   const packId = params.id as string;
   const { data: session } = useSession();
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const [loadingToGame, setLoadingToGame] = useState(false);
@@ -249,11 +271,7 @@ export default function TrainingPackDetailPage() {
   const [replyToCommentId, setReplyToCommentId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [userRating, setUserRating] = useState<number | null>(null); // Stores the current user's rating for this pack
-  
-  
   const [isFavorited, setIsFavorited] = useState<boolean | null>(null);
-
-  
   
   const { data: packResult, isLoading: packLoading, error: packError, refetch: refetchPack } = api.trainingPack.getByIdForWeb.useQuery(
     { id: packId },
@@ -261,14 +279,12 @@ export default function TrainingPackDetailPage() {
   );
   const pack = packResult; 
 
- 
   useEffect(() => {
     if (pack) {
       setIsFavorited(pack.isFavoritedByCurrentUser);
     }
   }, [pack]);
 
-  
   const { data: userRatingData, refetch: refetchUserRating } = api.trainingPack.getUserRatingForPack.useQuery(
     { trainingPackId: packId },
     { enabled: !!packId && !!session?.user }
@@ -279,13 +295,11 @@ export default function TrainingPackDetailPage() {
       setUserRating(userRatingData.value);
     }
   }, [userRatingData]);
-
   
   const { data: comments, isLoading: commentsLoading, refetch: refetchComments } = api.trainingPack.listCommentsForPack.useQuery(
     { trainingPackId: packId },
     { enabled: !!packId && !!session?.user } // only if loggged in
   );
-
   
   const { data: packWithMetadata, isLoading: metadataLoading } = api.trainingPack.getPackWithMetadata.useQuery(
     { id: packId },
@@ -293,7 +307,6 @@ export default function TrainingPackDetailPage() {
   );
   
   const getPackForPlugin = api.trainingPack.getByIdForPlugin.useMutation();
-  
   
   const { isConnected, sendTrainingPack } = usePluginConnection({
     port: 7437, 
@@ -313,8 +326,8 @@ export default function TrainingPackDetailPage() {
     }
   }, [packWithMetadata, showShotDetails, decodedData]);
 
-  const copyPackId = () => {
-    navigator.clipboard.writeText(packId);
+  const copyPackId = async () => {
+    await navigator.clipboard.writeText(packId);
     setCopied(true);
     toast.success("Pack ID copied!");
     setTimeout(() => setCopied(false), 2000); 
@@ -322,17 +335,14 @@ export default function TrainingPackDetailPage() {
 
   const toggleFavoriteMutation = api.trainingPack.toggleFavorite.useMutation({
     onMutate: () => {
-      
       setIsFavorited(current => !current);
     },
     onSuccess: (data) => {
-      
-      queryClient.invalidateQueries({ queryKey: [["trainingPack", "getByIdForWeb"], { id: packId }] });
+      void queryClient.invalidateQueries({ queryKey: [["trainingPack", "getByIdForWeb"], { id: packId }] });
       toast.success(data.favorited ? "Added to favorites!" : "Removed from favorites.");
     },
     onError: (error) => {
-      
-      setIsFavorited(pack?.isFavoritedByCurrentUser || false);
+      setIsFavorited(pack?.isFavoritedByCurrentUser ?? false);
       toast.error("Failed to update favorites: " + error.message);
     },
   });
@@ -340,8 +350,8 @@ export default function TrainingPackDetailPage() {
   const submitRatingMutation = api.trainingPack.submitOrUpdateRating.useMutation({
     onSuccess: (data) => {
       toast.success(`Rated ${data.userRating} stars!`);
-      refetchPack(); 
-      refetchUserRating(); 
+      void refetchPack();
+      void refetchUserRating();
     },
     onError: (error) => {
       toast.error("Failed to submit rating: " + error.message);
@@ -354,13 +364,12 @@ export default function TrainingPackDetailPage() {
       setNewComment(""); // Clear the main comment input
       setReplyText("");   // Clear reply input
       setReplyToCommentId(null); // Close reply form
-      refetchComments(); // Refetch comments to show the new one
+      void refetchComments(); // Refetch comments to show the new one
     },
     onError: (error) => {
       toast.error("Failed to add comment: " + error.message);
     },
   });
-
  
   const handleToggleFavorite = () => {
     if (!session?.user) {
@@ -368,7 +377,7 @@ export default function TrainingPackDetailPage() {
       return;
     }
     if (pack) {
-      toggleFavoriteMutation.mutate({ trainingPackId: pack.id });
+      void toggleFavoriteMutation.mutate({ trainingPackId: pack.id });
     }
   };
 
@@ -378,7 +387,7 @@ export default function TrainingPackDetailPage() {
       return;
     }
     setUserRating(newRatingValue); 
-    submitRatingMutation.mutate({ trainingPackId: packId, value: newRatingValue });
+    void submitRatingMutation.mutate({ trainingPackId: packId, value: newRatingValue });
   };
 
   const handleAddComment = (e: FormEvent) => {
@@ -391,7 +400,7 @@ export default function TrainingPackDetailPage() {
       toast.error("Comment cannot be empty.");
       return;
     }
-    addCommentMutation.mutate({ trainingPackId: packId, text: newComment, parentId: null });
+    void addCommentMutation.mutate({ trainingPackId: packId, text: newComment, parentId: null });
   };
 
   const handleAddReply = (parentId: string) => (e: FormEvent) => {
@@ -404,7 +413,7 @@ export default function TrainingPackDetailPage() {
       toast.error("Reply cannot be empty.");
       return;
     }
-    addCommentMutation.mutate({ trainingPackId: packId, text: replyText, parentId });
+    void addCommentMutation.mutate({ trainingPackId: packId, text: replyText, parentId });
   };
 
   const handleDownload = async () => {
@@ -418,8 +427,9 @@ export default function TrainingPackDetailPage() {
         saveAs(blob, `${safePackName}.json`);
         toast.success("Download started!");
       }
-    } catch (error: any) {
-      toast.error(`Error downloading pack: ${error.message}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error(`Error downloading pack: ${errorMessage}`);
     }
   };
 
@@ -440,9 +450,12 @@ export default function TrainingPackDetailPage() {
           toast.error("Failed to load pack into game. Check plugin console.");
         }
       }
-    } catch (error: any) {
-      toast.error(`Error loading pack in game: ${error.message}`);
-    } finally {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error(`Error loading pack in game: ${errorMessage}`);
+    }
+    
+    finally {
       setLoadingToGame(false);
     }
   };
@@ -510,16 +523,16 @@ export default function TrainingPackDetailPage() {
               onClick={handleToggleFavorite}
               disabled={toggleFavoriteMutation.isPending}
               className={`p-2 rounded-full transition-colors duration-150 ${
-                (isFavorited !== null ? isFavorited : pack.isFavoritedByCurrentUser) 
+                isFavorited ?? pack.isFavoritedByCurrentUser
                   ? 'text-red-500 bg-red-100 hover:bg-red-200' 
                   : 'text-gray-500 hover:bg-gray-100 hover:text-red-400'
               }`}
-              title={(isFavorited !== null ? isFavorited : pack.isFavoritedByCurrentUser) ? "Remove from Favorites" : "Add to Favorites"}
+              title={isFavorited ?? pack.isFavoritedByCurrentUser ? "Remove from Favorites" : "Add to Favorites"}
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
                 className="h-6 w-6" 
-                fill={(isFavorited !== null ? isFavorited : pack.isFavoritedByCurrentUser) ? "currentColor" : "none"} 
+                fill={isFavorited ?? pack.isFavoritedByCurrentUser ? "currentColor" : "none"} 
                 viewBox="0 0 24 24" 
                 stroke="currentColor"
               >
@@ -642,7 +655,7 @@ export default function TrainingPackDetailPage() {
                   <div key={comment.id} className="p-4 bg-gray-50 rounded-lg">
                     <div className="flex-grow">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="font-semibold text-sm">{comment.user.name || "Anonymous"}</p>
+                        <p className="font-semibold text-sm">{comment.user.name ?? "Anonymous"}</p>
                         <p className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleString()}</p>
                       </div>
                       <p className="text-gray-800 whitespace-pre-wrap">{comment.text}</p>
@@ -650,17 +663,17 @@ export default function TrainingPackDetailPage() {
                     
                     <button 
                       onClick={() => setReplyToCommentId(replyToCommentId === comment.id ? null : comment.id)} 
-                      className="text-xs text-blue-500 hover:underline mt-2 ml-11" // Aligned with comment text
+                      className="text-xs text-blue-500 hover:underline mt-2"
                     >
                       {replyToCommentId === comment.id ? "Cancel Reply" : "Reply"}
                     </button>
 
                     {replyToCommentId === comment.id && (
-                      <form onSubmit={handleAddReply(comment.id)} className="mt-2 ml-11"> {/* Aligned with comment text */}
+                      <form onSubmit={handleAddReply(comment.id)} className="mt-2">
                         <textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
-                          placeholder={`Replying to ${comment.user.name || "User"}...`}
+                          placeholder={`Replying to ${comment.user.name ?? "User"}...`}
                           className="w-full p-2 border rounded-md text-sm"
                           rows={2}
                           maxLength={1000}
@@ -673,19 +686,16 @@ export default function TrainingPackDetailPage() {
 
                     
                     {comment.replies && comment.replies.length > 0 && (
-                      <div className="mt-3 ml-11 space-y-3"> {/* Aligned with comment text */}
+                      <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
                         {comment.replies.map(reply => (
                           <div key={reply.id} className="bg-gray-100 p-3 rounded-md">
-                             <div className="flex items-start mb-1">
-                              <img src={reply.user.image || '/default-avatar.png'} alt={reply.user.name || 'User'} className="w-6 h-6 rounded-full mr-2 mt-1" />
-                              <div className="flex-grow">
-                                 <div className="flex items-center justify-between">
-                                  <p className="font-semibold text-xs">{reply.user.name || "Anonymous"}</p>
+                             <div className="flex-grow">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="font-semibold text-xs">{reply.user.name ?? "Anonymous"}</p>
                                   <p className="text-xs text-gray-500">{new Date(reply.createdAt).toLocaleString()}</p>
                                  </div>
-                                <p className="text-gray-700 text-sm whitespace-pre-wrap mt-0.5">{reply.text}</p>
-                              </div>
-                            </div>
+                                <p className="text-gray-700 text-sm whitespace-pre-wrap">{reply.text}</p>
+                             </div>
                           </div>
                         ))}
                       </div>

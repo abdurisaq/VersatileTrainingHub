@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePluginConnection } from "~/hooks/usePluginConnection";
+
+
+interface PluginPackData {
+  trainingData: string;
+  shotsRecording?: string;
+  numShots?: number;
+}
 
 export default function UpdateTrainingPackPage() {
   const params = useParams();
@@ -17,28 +24,24 @@ export default function UpdateTrainingPackPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Get the original pack data
   const { data: pack, isLoading, error, isError } = api.trainingPack.getByIdForEdit.useQuery(
     { id: packId },
     { 
       enabled: !!packId && !!session,
       retry: (failureCount, error) => {
-        // Don't retry for 'FORBIDDEN' errors
+        
         if (error.data?.code === 'FORBIDDEN') {
           return false;
         }
-        return failureCount < 3; // retry other errors up to 3 times
+        return failureCount < 3; 
       }
     }
   );
 
-  // Plugin connection
   const { isConnected } = usePluginConnection({
     port: 7437,
     authToken: "versatile_training_scanner_token",
   });
-
-  // Update pack mutation
   const updatePack = api.trainingPack.updateWithData.useMutation({
     onSuccess: (data) => {
       setIsSubmitting(false);
@@ -53,7 +56,6 @@ export default function UpdateTrainingPackPage() {
     },
   });
 
-  // Show a proper error message for all errors
   if (isError) {
     return (
       <div className="container mx-auto p-4 max-w-3xl">
@@ -79,7 +81,6 @@ export default function UpdateTrainingPackPage() {
     );
   }
 
-  // Authentication checks
   if (status === "loading" || isLoading) {
     return <div className="container mx-auto p-4 max-w-3xl text-center py-12">Loading...</div>;
   }
@@ -89,13 +90,12 @@ export default function UpdateTrainingPackPage() {
     return null;
   }
 
-  // Authorization check - only the creator can update
   if (pack && pack.creatorId !== session?.user?.id) {
     return (
       <div className="container mx-auto p-4 max-w-3xl">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <p className="font-bold">Unauthorized</p>
-          <p>You don't have permission to update this training pack.</p>
+          <p>You don&apos;t have permission to update this training pack.</p>
         </div>
         <Link href={`/training-packs/${packId}`} className="text-blue-600 hover:underline">
           Return to training pack
@@ -104,7 +104,6 @@ export default function UpdateTrainingPackPage() {
     );
   }
 
-  // Handle pack update from plugin
   const handleUpdateFromPlugin = async () => {
     if (!isConnected) {
       setErrorMessage("Please make sure Rocket League is running with the VersatileTraining plugin installed.");
@@ -121,13 +120,12 @@ export default function UpdateTrainingPackPage() {
     setSuccessMessage("");
 
     try {
-      // Determine the code to use - prefer the stored code, fallback to ID
-      const packCode = pack.code || packId;
+      
+      const packCode = pack.code ?? packId;
       
       console.log("Fetching updated pack data for:", packCode);
       
-      // Make a request to get both pack and recording data from the plugin
-      // This matches your upload page implementation
+      
       const response = await fetch(`http://localhost:7437/pack-recording/${packCode}`, {
         headers: {
           'Authorization': `Bearer versatile_training_scanner_token`
@@ -143,13 +141,12 @@ export default function UpdateTrainingPackPage() {
         throw new Error(`Plugin returned error ${response.status}: ${errorText}`);
       }
       
-      // Get text response and sanitize it
       const responseText = await response.text();
       const sanitizedText = responseText.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
       
-      let packData;
+      let packData: PluginPackData;
       try {
-        packData = JSON.parse(sanitizedText);
+        packData = JSON.parse(sanitizedText) as PluginPackData;
       } catch (parseError) {
         console.error("Failed to parse JSON:", parseError);
         console.log("Response data:", sanitizedText.substring(0, 200) + "..."); // Log a preview
@@ -157,29 +154,28 @@ export default function UpdateTrainingPackPage() {
       }
       
       console.log("Received pack data with size:", 
-        packData.trainingData?.length || 0, 
+        packData.trainingData?.length ?? 0, 
         "bytes and recording size:", 
-        packData.shotsRecording?.length || 0, "bytes");
+        packData.shotsRecording?.length ?? 0, "bytes");
       
       if (!packData.trainingData) {
         throw new Error("Missing training data in plugin response");
       }
       
-      // Now update the training pack with the new data
-      // Keep most metadata the same, just update the actual pack data
+    
       const updateData = {
         id: packId,
         name: pack.name,
-        description: pack.description || "",
+        description: pack.description ?? "",
         packMetadataCompressed: packData.trainingData,
-        recordingDataCompressed: packData.shotsRecording || "",
-        totalShots: packData.numShots || pack.totalShots,
+        recordingDataCompressed: packData.shotsRecording ?? "",
+        totalShots: packData.numShots ?? pack.totalShots,
         tags: pack.tags,
-        difficulty: pack.difficulty || 1,
+        difficulty: pack.difficulty ?? 1,
         visibility: pack.visibility,
       };
       
-      // Submit to API
+      // submit
       await updatePack.mutateAsync(updateData);
     } catch (error) {
       setIsSubmitting(false);
@@ -188,13 +184,12 @@ export default function UpdateTrainingPackPage() {
     }
   };
 
-  // Handle the case where the pack isn't found
   if (!pack && !isLoading && !isError) {
     return (
       <div className="container mx-auto p-4 max-w-3xl text-center py-12">
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded mb-4">
           <p className="font-bold">Training Pack Not Found</p>
-          <p>The training pack you're looking for doesn't exist or has been removed.</p>
+          <p>The training pack you&apos;re looking for doesn&apos;t exist or has been removed.</p>
         </div>
         <Link 
           href="/training-packs" 
@@ -227,7 +222,7 @@ export default function UpdateTrainingPackPage() {
           <h2 className="text-xl font-semibold mb-2">{pack?.name}</h2>
           <p className="text-gray-600 mb-4">
             This will update the training data for this pack from the currently loaded pack in your game.
-            The pack's metadata (name, description, tags, etc.) will remain the same.
+            The pack&apos;s metadata (name, description, tags, etc.) will remain the same.
           </p>
           
           {isConnected ? (
@@ -246,7 +241,7 @@ export default function UpdateTrainingPackPage() {
             <p className="font-medium">Important:</p>
             <ul className="list-disc list-inside space-y-1 mt-1">
               <li>Make sure you have loaded the correct training pack in your game</li>
-              <li>Use the pack code: <span className="font-mono bg-gray-200 px-1 rounded">{pack?.code || packId}</span></li>
+              <li>Use the pack code: <span className="font-mono bg-gray-200 px-1 rounded">{pack?.code ?? packId}</span></li>
               <li>Any changes to shots or ball/car positions will be updated</li>
               <li>This will replace the current pack data on the server</li>
             </ul>
