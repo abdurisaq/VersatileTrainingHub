@@ -7,11 +7,13 @@ import { api } from "~/trpc/react";
 import { DeleteAccountButton } from "~/app/components/delete-account-button";
 import Link from "next/link";
 import { usePluginConnection } from "~/hooks/usePluginConnection";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'info' | 'packs'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'packs' | 'favorites'>('info');
+  const queryClient = useQueryClient();
 
   // Plugin connection to enable updating packs
   const { isConnected } = usePluginConnection({
@@ -25,6 +27,11 @@ export default function ProfilePage() {
     { enabled: !!session }
   );
   
+  const { data: favoritePacks, isLoading: favoritesLoading } = api.trainingPack.listUserFavorites.useQuery(
+    undefined, 
+    { enabled: !!session && activeTab === 'favorites' }
+  );
+  
   // Delete pack mutation
   const deletePack = api.trainingPack.delete.useMutation({
     onSuccess: () => {
@@ -32,10 +39,16 @@ export default function ProfilePage() {
     },
   });
 
-  // Update visibility mutation
   const updateVisibility = api.trainingPack.updateVisibility.useMutation({
     onSuccess: () => {
       refetch();
+    },
+  });
+
+
+  const toggleFavoriteMutation = api.trainingPack.toggleFavorite.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [["trainingPack", "listUserFavorites"]] });
     },
   });
 
@@ -49,6 +62,13 @@ export default function ProfilePage() {
   // Handle visibility change
   const handleVisibilityChange = async (packId: string, visibility: "PUBLIC" | "PRIVATE" | "UNLISTED") => {
     await updateVisibility.mutateAsync({ id: packId, visibility });
+  };
+
+  // Handle removing pack from favorites
+  const handleToggleFavorite = async (packId: string) => {
+    if (confirm("Are you sure you want to remove this training pack from your favorites?")) {
+      await toggleFavoriteMutation.mutateAsync({ trainingPackId: packId });
+    }
   };
 
   if (status === "loading") {
@@ -93,6 +113,12 @@ export default function ProfilePage() {
               className={`py-2 px-1 ${activeTab === 'packs' ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-500'}`}
             >
               Your Training Packs
+            </button>
+            <button 
+              onClick={() => setActiveTab('favorites')}
+              className={`py-2 px-1 ${activeTab === 'favorites' ? 'border-b-2 border-blue-500 font-medium text-blue-600' : 'text-gray-500'}`}
+            >
+              Favorites
             </button>
           </nav>
         </div>
@@ -229,6 +255,87 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'favorites' && (
+          <div>
+            <h3 className="font-medium mb-4">Your Favorite Training Packs</h3>
+            
+            {favoritesLoading ? (
+              <p className="text-gray-500 py-4">Loading your favorite packs...</p>
+            ) : !favoritePacks || favoritePacks.length === 0 ? (
+              <div className="bg-gray-50 rounded-lg p-8 text-center">
+                <p className="text-gray-500 mb-4">You haven't favorited any training packs yet.</p>
+                <Link
+                  href="/training-packs"
+                  className="text-blue-600 hover:underline"
+                >
+                  Browse training packs
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {favoritePacks.map((favorite) => {
+                  const pack = favorite;
+                  return (
+                    <div key={pack.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <Link href={`/training-packs/${pack.id}`} className="text-lg font-medium text-blue-600 hover:underline">
+                            {pack.name}
+                          </Link>
+                          <p className="text-sm text-gray-500">
+                            By {pack.creator?.name || "Unknown"} • {pack.totalShots} shots • {pack.downloadCount} downloads
+                          </p>
+                          {pack.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {pack.tags.map(tag => (
+                                <span key={tag} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          
+                          <span className={`text-xs font-medium px-2 py-1 rounded ${
+                            pack.visibility === "PUBLIC" ? "bg-green-100 text-green-800" :
+                            pack.visibility === "UNLISTED" ? "bg-yellow-100 text-yellow-800" :
+                            "bg-gray-100 text-gray-800"
+                          }`}>
+                            {pack.visibility}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 flex justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-yellow-500">★</span>
+                          <span className="text-sm text-gray-700">{pack.averageRating.toFixed(1)}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleToggleFavorite(pack.id)}
+                          className="text-red-500 text-sm hover:underline flex items-center"
+                        >
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-4 w-4 mr-1" 
+                            fill="currentColor" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                          Remove from Favorites
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

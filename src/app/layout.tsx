@@ -30,20 +30,20 @@ async function NavBar() {
         </a>
         
         <div className="flex items-center space-x-6">
-          <a href="/training-packs" className="hover:text-gray-300">
+          <a href="/training-packs" className="hover:text-gray-300 py-1 px-3">
             Browse Packs
           </a>
           
           {session ? (
             <>
-              <a href="/training-packs/upload" className="hover:text-gray-300">
+              <a href="/training-packs/upload" className="hover:text-gray-300 py-1 px-3">
                 Upload Pack
               </a>
               <UserNav user={session.user} />
             </>
           ) : (
             <div className="flex space-x-4">
-              <a href="/auth/signin" className="hover:text-gray-300">
+              <a href="/auth/signin" className="hover:text-gray-300 py-1 px-3">
                 Sign In
               </a>
               <a href="/auth/signup" className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700">

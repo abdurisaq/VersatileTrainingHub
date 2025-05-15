@@ -20,8 +20,7 @@ const trainingPackSchema = z.object({
   packMetadataCompressed: z.string().min(1),
   shots: z.array(shotSchema).min(1).max(100),
   visibility: z.nativeEnum(Visibility).default(Visibility.PUBLIC),
-  gameVersion: z.string().max(50).optional().nullable(),
-  pluginVersion: z.string().max(50).optional().nullable(),
+  
 });
 
 export async function POST(req: NextRequest) {
