@@ -18,7 +18,7 @@ const createTrainingPackInputSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters").max(100, "Name too long"),
   description: z.string().max(2000, "Description too long").optional().nullable(),
   code: z.string().max(50, "Pack code too long").optional().nullable(),
-  difficulty: z.number().int().min(1).max(5).optional().nullable(),
+  difficulty: z.number().int().min(1).max(8).optional().nullable(),
   tags: z.array(z.string().max(30)).max(10).optional().default([]),
   packMetadataCompressed: z.string().min(1, "Pack metadata is required (Base64)"),
   recordingDataCompressed: z.string().optional().default(""), // New field for all recordings
@@ -208,7 +208,7 @@ export const trainingPackRouter = createTRPCRouter({
   submitOrUpdateRating: protectedProcedure
     .input(z.object({
       trainingPackId: z.string(),
-      value: z.number().int().min(1).max(5), 
+      value: z.number().int().min(1).max(8), 
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -598,7 +598,7 @@ export const trainingPackRouter = createTRPCRouter({
       name: z.string().min(3).max(100),
       description: z.string().max(2000).optional().nullable(),
       tags: z.array(z.string()).optional(),
-      difficulty: z.number().int().min(1).max(5).optional(),
+      difficulty: z.number().int().min(1).max(8).optional(),
       visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -650,7 +650,7 @@ export const trainingPackRouter = createTRPCRouter({
       name: z.string().min(3, "Name must be at least 3 characters").max(100, "Name too long"),
       description: z.string().max(2000, "Description too long").optional().nullable(),
       code: z.string().max(50, "Pack code too long").optional().nullable(),
-      difficulty: z.number().int().min(1).max(5).optional(),
+      difficulty: z.number().int().min(1).max(8).optional(),
       tags: z.array(z.string().max(30)).max(10).optional(),
       visibility: z.enum(["PUBLIC", "PRIVATE", "UNLISTED"]),
     }))

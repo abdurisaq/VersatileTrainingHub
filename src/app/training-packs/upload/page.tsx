@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { usePluginConnection } from "~/hooks/usePluginConnection";
+import { ROCKET_LEAGUE_RANKS } from "~/utils/ranks";
 
 interface LocalPack {
   id: string;
@@ -299,18 +300,18 @@ export default function UploadTrainingPackPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1">Difficulty (1-5)</label>
+            <label className="block text-sm font-medium mb-1">Difficulty (Rank)</label>
             <select
               name="difficulty"
               value={formData.difficulty}
               onChange={handleInputChange}
               className="w-full border rounded-md p-2"
             >
-              <option value={1}>1 - Beginner</option>
-              <option value={2}>2 - Easy</option>
-              <option value={3}>3 - Medium</option>
-              <option value={4}>4 - Hard</option>
-              <option value={5}>5 - Expert</option>
+              {ROCKET_LEAGUE_RANKS.map(rank => (
+                <option key={rank.value} value={rank.value}>
+                  {rank.name}
+                </option>
+              ))}
             </select>
           </div>
           

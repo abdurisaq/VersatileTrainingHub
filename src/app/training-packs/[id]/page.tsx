@@ -10,7 +10,9 @@ import { useState, useEffect } from "react";
 import type {FormEvent} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from 'react-hot-toast'; 
-
+import { getRankByValue } from "~/utils/ranks";
+import type {Rank} from "~/utils/ranks";
+import Image from "next/image";
 
 interface Vector {
   x: number;
@@ -22,6 +24,7 @@ interface ShotDetail {
   boostAmount: number;
   startingVelocity: number;
   extendedVelocity: Vector;
+  extendedAngularVelocity: Vector;
   freezeCar: boolean;
   hasStartingJump: boolean;
   goalBlocker: {
@@ -111,106 +114,199 @@ function decompressVectors(
 
 function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
   try {
+    console.log("Starting decodeTrainingPack with base64String:", base64String);
     const TRAINING_CODE_FLAG_BITS = 1;
-    const TRAINING_CODE_CHARS = 19; 
-    const NAME_LEN_BITS = 5; 
-    const NUM_SHOTS_BITS = 6; 
-    const BOOST_MIN_BITS = 7; 
-    const VELOCITY_MIN_BITS = 12; 
-    const MAX_REASONABLE_SHOTS = 50; 
-    
+    const TRAINING_CODE_CHARS = 19;
+    const NAME_LEN_BITS = 5;
+    const NUM_SHOTS_BITS = 6;
+    const BOOST_MIN_BITS = 7;
+    const VELOCITY_MIN_BITS = 12; // For scalar starting velocity & goal blocker components
+    const MAX_LINEAR_MAG_BITS = 12; // For extended linear velocity vector
+    const MAX_ANGULAR_MAG_BITS = 8; // For extended angular velocity vector
+    const MAX_REASONABLE_SHOTS = 50;
+
     const bitstream = base64Decode(base64String);
+    console.log("Decoded bitstream (first 20 bytes):", bitstream.slice(0, 20));
     const bitIndex = { value: 0 };
 
     const hasCode = readBits(bitstream, bitIndex, TRAINING_CODE_FLAG_BITS) !== 0;
+    console.log("hasCode:", hasCode, "current bitIndex:", bitIndex.value);
     let code = "";
     if (hasCode) {
       for (let i = 0; i < TRAINING_CODE_CHARS; i++) code += String.fromCharCode(readBits(bitstream, bitIndex, 8));
+      console.log("Decoded code:", code, "current bitIndex:", bitIndex.value);
     }
 
     const nameLength = readBits(bitstream, bitIndex, NAME_LEN_BITS);
+    console.log("nameLength:", nameLength, "current bitIndex:", bitIndex.value);
     if (nameLength === 0 || nameLength > 30) throw new Error(`Invalid name length: ${nameLength}`);
+
     const numShots = readBits(bitstream, bitIndex, NUM_SHOTS_BITS);
+    console.log("numShots:", numShots, "current bitIndex:", bitIndex.value);
     if (numShots <= 0 || numShots > MAX_REASONABLE_SHOTS) throw new Error(`Invalid num shots: ${numShots}`);
-    
+
     const minBoost = readBits(bitstream, bitIndex, BOOST_MIN_BITS);
-    const minVelocity = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS);
-    const maxMagnitude = readBits(bitstream, bitIndex, 12); 
-    const minGoalBlockX = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS); 
-    const minGoalBlockZ = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS); 
-    
+    console.log("minBoost:", minBoost, "current bitIndex:", bitIndex.value);
+
+    const minVelocity = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS); // Scalar starting velocity
+    console.log("minVelocity (for scalar):", minVelocity, "current bitIndex:", bitIndex.value);
+
+    const maxMagnitude = readBits(bitstream, bitIndex, MAX_LINEAR_MAG_BITS); // For extended linear velocity
+    console.log("maxMagnitude (for linear vector):", maxMagnitude, "current bitIndex:", bitIndex.value);
+
+    const maxMagnitudeAng = readBits(bitstream, bitIndex, MAX_ANGULAR_MAG_BITS); // For extended angular velocity
+    console.log("maxMagnitudeAng (for angular vector):", maxMagnitudeAng, "current bitIndex:", bitIndex.value);
+
+    const minGoalBlockX = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS);
+    console.log("minGoalBlockX:", minGoalBlockX, "current bitIndex:", bitIndex.value);
+
+    const minGoalBlockZ = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS);
+    console.log("minGoalBlockZ:", minGoalBlockZ, "current bitIndex:", bitIndex.value);
+
     const packedBits = readBits(bitstream, bitIndex, 7);
+    console.log("packedBits (boost/velocity):", packedBits.toString(2).padStart(7, '0'), "current bitIndex:", bitIndex.value);
     const numBitsForBoost = (packedBits >> 4) & 0x07;
-    const numBitsForVelocity = packedBits & 0x0F;
+    const numBitsForVelocity = packedBits & 0x0F; // For scalar starting velocity
+    console.log("numBitsForBoost:", numBitsForBoost, "numBitsForVelocity (scalar):", numBitsForVelocity);
     if (numBitsForBoost > 7 || numBitsForVelocity > 15) throw new Error("Invalid boost/velocity bit counts");
 
     const packedGoalBlockerBits = readBits(bitstream, bitIndex, 8);
+    console.log("packedGoalBlockerBits:", packedGoalBlockerBits.toString(2).padStart(8, '0'), "current bitIndex:", bitIndex.value);
     const numBitsForXBlocker = (packedGoalBlockerBits >> 4) & 0x0F;
     const numBitsForZBlocker = packedGoalBlockerBits & 0x0F;
+    console.log("numBitsForXBlocker:", numBitsForXBlocker, "numBitsForZBlocker:", numBitsForZBlocker);
     if (numBitsForXBlocker > 15 || numBitsForZBlocker > 15) throw new Error("Invalid goal blocker bit counts");
-    
+
     let name = "";
     for (let i = 0; i < nameLength; i++) name += String.fromCharCode(readBits(bitstream, bitIndex, 7));
-    
+    console.log("Decoded name:", name, "current bitIndex:", bitIndex.value);
+
     const boostAmounts = new Array(numShots).fill(0) as number[];
-    const startingVelocities = new Array(numShots).fill(0) as number[];
+    const startingVelocities = new Array(numShots).fill(0) as number[]; // scalar velocities
     const extendedVelocities = Array.from({ length: numShots }, () => ({ x: 0, y: 0, z: 0 })) as Vector[];
+    const extendedAngularVelocities = Array.from({ length: numShots }, () => ({ x: 0, y: 0, z: 0 })) as Vector[]; // Initialize
     const freezeCar = new Array(numShots).fill(false) as boolean[];
     const hasStartingJump = new Array(numShots).fill(false) as boolean[];
-    
+
+    console.log("Before decompressing boostAmounts. minBoost:", minBoost, "numBitsForBoost:", numBitsForBoost);
     if (numBitsForBoost === 0) {
       boostAmounts.fill(minBoost);
+      console.log("Filled boostAmounts with minBoost:", boostAmounts);
     } else {
       decompressIntegers(boostAmounts, minBoost, numBitsForBoost, bitstream, bitIndex);
+      console.log("Decompressed boostAmounts:", boostAmounts, "current bitIndex:", bitIndex.value);
     }
-    
+
+    console.log("Before decompressing startingVelocities (scalar). minVelocity:", minVelocity, "numBitsForVelocity:", numBitsForVelocity);
     if (numBitsForVelocity === 0) {
       startingVelocities.fill(minVelocity);
+      console.log("Filled startingVelocities with minVelocity:", startingVelocities);
     } else {
       decompressIntegers(startingVelocities, minVelocity, numBitsForVelocity, bitstream, bitIndex);
+      console.log("Decompressed startingVelocities (scalar):", startingVelocities, "current bitIndex:", bitIndex.value);
     }
-    
-    if (maxMagnitude !== 0) decompressVectors(extendedVelocities, maxMagnitude, bitstream, bitIndex);
-    
+
+    console.log("Before decompressing extendedVelocities (linear). maxMagnitude:", maxMagnitude);
+    if (maxMagnitude !== 0) {
+      decompressVectors(extendedVelocities, maxMagnitude, bitstream, bitIndex);
+      console.log("Decompressed extendedVelocities (linear):", extendedVelocities, "current bitIndex:", bitIndex.value);
+    } else {
+      console.log("Skipped decompressing extendedVelocities (linear) as maxMagnitude is 0.");
+      // extendedVelocities will remain filled with {x:0, y:0, z:0}
+    }
+
+    const hasAngularVelocityFlags = new Array(numShots).fill(false) as boolean[];
+    console.log("Before decompressing hasAngularVelocityFlags.");
+    decompressBits(hasAngularVelocityFlags, bitstream, bitIndex);
+    console.log("Decompressed hasAngularVelocityFlags:", hasAngularVelocityFlags, "current bitIndex:", bitIndex.value);
+
+    const numAngVelocitiesToRead = hasAngularVelocityFlags.filter(Boolean).length;
+    console.log("numAngVelocitiesToRead:", numAngVelocitiesToRead, "maxMagnitudeAng:", maxMagnitudeAng);
+
+    if (numAngVelocitiesToRead > 0 && maxMagnitudeAng !== 0) {
+      const tempAngularVelocities = Array.from({ length: numAngVelocitiesToRead }, () => ({ x: 0, y: 0, z: 0 })) as Vector[];
+      decompressVectors(tempAngularVelocities, maxMagnitudeAng, bitstream, bitIndex);
+      console.log("Decompressed tempAngularVelocities:", tempAngularVelocities, "current bitIndex:", bitIndex.value);
+      let currentAngVelIndex = 0;
+      for (let i = 0; i < numShots; i++) {
+        if (hasAngularVelocityFlags[i]) {
+          if (currentAngVelIndex < tempAngularVelocities.length) {
+            extendedAngularVelocities[i] = tempAngularVelocities[currentAngVelIndex]!;
+            currentAngVelIndex++;
+          } else {
+            console.warn(`Ran out of decompressed angular velocities for shot ${i}`);
+            extendedAngularVelocities[i] = { x: 0, y: 0, z: 0 }; // Fallback
+          }
+        } else {
+          extendedAngularVelocities[i] = { x: 0, y: 0, z: 0 }; // No angular velocity for this shot
+        }
+      }
+    } else {
+      console.log("Skipped decompressing angular velocities (either none flagged or maxMagnitudeAng is 0).");
+      // extendedAngularVelocities will remain filled with {x:0, y:0, z:0}
+    }
+
+
     const xVals = new Array(numShots * 2).fill(0) as number[];
     const zVals = new Array(numShots * 2).fill(0) as number[];
-    
+
+    console.log("Before decompressing xVals (blocker). minGoalBlockX:", minGoalBlockX, "numBitsForXBlocker:", numBitsForXBlocker);
     if (numBitsForXBlocker === 0) {
       xVals.fill(minGoalBlockX);
+      console.log("Filled xVals with minGoalBlockX:", xVals);
     } else {
       decompressIntegers(xVals, minGoalBlockX, numBitsForXBlocker, bitstream, bitIndex);
+      console.log("Decompressed xVals (blocker):", xVals, "current bitIndex:", bitIndex.value);
     }
-    
+
+    console.log("Before decompressing zVals (blocker). minGoalBlockZ:", minGoalBlockZ, "numBitsForZBlocker:", numBitsForZBlocker);
     if (numBitsForZBlocker === 0) {
       zVals.fill(minGoalBlockZ);
+      console.log("Filled zVals with minGoalBlockZ:", zVals);
     } else {
       decompressIntegers(zVals, minGoalBlockZ, numBitsForZBlocker, bitstream, bitIndex);
+      console.log("Decompressed zVals (blocker):", zVals, "current bitIndex:", bitIndex.value);
     }
-    
+
+    console.log("Before decompressing freezeCar bits.");
     decompressBits(freezeCar, bitstream, bitIndex);
+    console.log("Decompressed freezeCar:", freezeCar, "current bitIndex:", bitIndex.value);
+
+    console.log("Before decompressing hasStartingJump bits.");
     decompressBits(hasStartingJump, bitstream, bitIndex);
-    
+    console.log("Decompressed hasStartingJump:", hasStartingJump, "current bitIndex:", bitIndex.value);
+
     const shotDetails: ShotDetail[] = [];
+    console.log("Processing shot details loop for numShots:", numShots);
     for (let i = 0; i < numShots; i++) {
-      if (i * 2 + 1 >= xVals.length || i * 2 + 1 >= zVals.length) continue; // Bounds check
+      if (i * 2 + 1 >= xVals.length || i * 2 + 1 >= zVals.length) {
+        console.warn(`Bounds check failed for shot ${i}. xVals.length: ${xVals.length}, zVals.length: ${zVals.length}`);
+        continue;
+      }
       const detail: ShotDetail = {
         boostAmount: boostAmounts[i]!,
-        startingVelocity: startingVelocities[i]! - 2000,
+        startingVelocity: startingVelocities[i]! - 2000, // scalar velocity
         extendedVelocity: extendedVelocities[i]!,
+        extendedAngularVelocity: extendedAngularVelocities[i]!, // Add this
         freezeCar: freezeCar[i]!,
         hasStartingJump: hasStartingJump[i]!,
         goalBlocker: {
-          firstX: xVals[i * 2]! - 910, 
+          firstX: xVals[i * 2]! - 910,
           firstZ: zVals[i * 2]! - 20,
-          secondX: xVals[i * 2 + 1]! - 910, 
+          secondX: xVals[i * 2 + 1]! - 910,
           secondZ: zVals[i * 2 + 1]! - 20
         }
       };
+      console.log(`Shot ${i} details:`, JSON.parse(JSON.stringify(detail))); // Deep copy for logging
       shotDetails.push(detail);
     }
-    return { name, code, numShots: shotDetails.length, shotDetails };
+    console.log("Final bitIndex after all reads:", bitIndex.value);
+    console.log("Total bits expected (approx):", bitIndex.value, "Total bits in stream:", bitstream.length * 8);
+    const finalResult = { name, code, numShots: shotDetails.length, shotDetails };
+    console.log("decodeTrainingPack finished. Returning:", JSON.parse(JSON.stringify(finalResult)));
+    return finalResult;
   } catch (error) {
-    console.error("Error decoding training pack:", error);
+    console.error("Error during decodeTrainingPack:", error);
     return null;
   }
 }
@@ -260,7 +356,7 @@ export default function TrainingPackDetailPage() {
   const packId = params.id as string;
   const { data: session } = useSession();
   const queryClient = useQueryClient();
-
+  
   const [loadingToGame, setLoadingToGame] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShotDetails, setShowShotDetails] = useState(false);
@@ -279,6 +375,7 @@ export default function TrainingPackDetailPage() {
   );
   const pack = packResult; 
 
+  const packRank: Rank | undefined = pack ? getRankByValue(pack.difficulty) : undefined;
   useEffect(() => {
     if (pack) {
       setIsFavorited(pack.isFavoritedByCurrentUser);
@@ -477,23 +574,37 @@ export default function TrainingPackDetailPage() {
               <tr>
                 <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                 <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Boost</th>
-                <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocity</th>
+                <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocity (Mag)</th>
                 <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Freeze</th>
                 <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jump</th>
                 <th className="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blocker</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {decodedData.shotDetails.map((shot, index) => (
-                <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                  <td className="py-2 px-3 text-sm text-gray-900">{index + 1}</td>
-                  <td className="py-2 px-3 text-sm text-gray-900">{shot.boostAmount}</td>
-                  <td className="py-2 px-3 text-sm text-gray-900" title={`X:${shot.extendedVelocity.x.toFixed(0)},Y:${shot.extendedVelocity.y.toFixed(0)},Z:${shot.extendedVelocity.z.toFixed(0)}`}>{shot.startingVelocity}</td>
-                  <td className="py-2 px-3 text-sm text-gray-900">{shot.freezeCar ? "Yes" : "No"}</td>
-                  <td className="py-2 px-3 text-sm text-gray-900">{shot.hasStartingJump ? "Yes" : "No"}</td>
-                  <td className="py-2 px-3 text-sm text-gray-900">{(shot.goalBlocker.firstX === 910 && shot.goalBlocker.firstZ === 20 && shot.goalBlocker.secondX === 910 && shot.goalBlocker.secondZ === 20) ? "None" : "Active"}</td>
-                </tr>
-              ))}
+              {decodedData.shotDetails.map((shot, index) => {
+                const velocityMagnitude = Math.sqrt(
+                  shot.extendedVelocity.x ** 2 +
+                  shot.extendedVelocity.y ** 2 +
+                  shot.extendedVelocity.z ** 2
+                ).toFixed(0);
+                // Check for inactive blocker based on decoded (and offset-subtracted) values being zero
+                const isBlockerInactive = shot.goalBlocker.firstX === 0 &&
+                                          shot.goalBlocker.firstZ === 0 &&
+                                          shot.goalBlocker.secondX === 0 &&
+                                          shot.goalBlocker.secondZ === 0;
+                return (
+                  <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="py-2 px-3 text-sm text-gray-900">{index + 1}</td>
+                    <td className="py-2 px-3 text-sm text-gray-900">{shot.boostAmount}</td>
+                    <td className="py-2 px-3 text-sm text-gray-900" title={`X:${shot.extendedVelocity.x.toFixed(0)}, Y:${shot.extendedVelocity.y.toFixed(0)}, Z:${shot.extendedVelocity.z.toFixed(0)}`}>
+                      {velocityMagnitude}
+                    </td>
+                    <td className="py-2 px-3 text-sm text-gray-900">{shot.freezeCar ? "Yes" : "No"}</td>
+                    <td className="py-2 px-3 text-sm text-gray-900">{shot.hasStartingJump ? "Yes" : "No"}</td>
+                    <td className="py-2 px-3 text-sm text-gray-900">{isBlockerInactive ? "None" : "Active"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -563,7 +674,19 @@ export default function TrainingPackDetailPage() {
           </div>
           <div className="text-sm text-gray-700 space-y-1">
             {pack.code && <p><span className="font-semibold">Official Code:</span> <code className="bg-gray-100 px-1 rounded">{pack.code}</code></p>}
-            <p><span className="font-semibold">Difficulty:</span> {pack.difficulty ?? "N/A"}</p>
+            
+            <p className="flex items-baseline"> {/* Changed from items-center to items-baseline */}
+              <span className="font-semibold mr-2">Difficulty:</span>
+              {packRank ? (
+                <>
+                  <Image src={packRank.image} alt={packRank.name} width={28} height={28} className="mr-1.5" />
+                  <span className={packRank.textColorClass}>{packRank.name}</span>
+                </>
+              ) : (
+                "N/A"
+              )}
+            </p>
+
             <p><span className="font-semibold">Shots:</span> {pack.totalShots}</p>
             <p><span className="font-semibold">Downloads:</span> {pack.downloadCount}</p>
             <p><span className="font-semibold">Visibility:</span> {pack.visibility}</p>
