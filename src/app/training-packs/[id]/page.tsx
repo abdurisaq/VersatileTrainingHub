@@ -120,7 +120,8 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     const NAME_LEN_BITS = 5;
     const NUM_SHOTS_BITS = 6;
     const BOOST_MIN_BITS = 7;
-    const VELOCITY_MIN_BITS = 12; // For scalar starting velocity & goal blocker components
+    const VELOCITY_MIN_BITS = 13; // For scalar starting velocity & goal blocker components
+    const GOAL_MIN_BITS = 12;
     const MAX_LINEAR_MAG_BITS = 12; // For extended linear velocity vector
     const MAX_ANGULAR_MAG_BITS = 8; // For extended angular velocity vector
     const MAX_REASONABLE_SHOTS = 50;
@@ -157,10 +158,10 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     const maxMagnitudeAng = readBits(bitstream, bitIndex, MAX_ANGULAR_MAG_BITS); // For extended angular velocity
     console.log("maxMagnitudeAng (for angular vector):", maxMagnitudeAng, "current bitIndex:", bitIndex.value);
 
-    const minGoalBlockX = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS);
+    const minGoalBlockX = readBits(bitstream, bitIndex, GOAL_MIN_BITS);
     console.log("minGoalBlockX:", minGoalBlockX, "current bitIndex:", bitIndex.value);
 
-    const minGoalBlockZ = readBits(bitstream, bitIndex, VELOCITY_MIN_BITS);
+    const minGoalBlockZ = readBits(bitstream, bitIndex, GOAL_MIN_BITS);
     console.log("minGoalBlockZ:", minGoalBlockZ, "current bitIndex:", bitIndex.value);
 
     const packedBits = readBits(bitstream, bitIndex, 7);
@@ -285,7 +286,7 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
       }
       const detail: ShotDetail = {
         boostAmount: boostAmounts[i]!,
-        startingVelocity: startingVelocities[i]! - 2000, // scalar velocity
+        startingVelocity: startingVelocities[i]! - 2300, // scalar velocity
         extendedVelocity: extendedVelocities[i]!,
         extendedAngularVelocity: extendedAngularVelocities[i]!, // Add this
         freezeCar: freezeCar[i]!,

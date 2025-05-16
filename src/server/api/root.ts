@@ -1,7 +1,7 @@
 import { createTRPCRouter } from "~/server/api/trpc";
 import { trainingPackRouter } from "~/server/api/routers/trainingPack";
 import { createCallerFactory } from "~/server/api/trpc";
-
+import { userRouter } from "~/server/api/routers/user";
 
 /**
  * This is the primary router for your server.
@@ -10,6 +10,7 @@ import { createCallerFactory } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   trainingPack: trainingPackRouter,
+  user: userRouter,
 });
 
 // Create a server-side caller
