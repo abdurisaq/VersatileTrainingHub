@@ -1,5 +1,5 @@
 import "~/styles/globals.css";
-import { Inter } from "next/font/google";
+
 import { TRPCReactProvider } from "~/trpc/react";
 import { getServerAuthSession } from "~/server/auth";
 import { Providers } from "./providers";
@@ -8,10 +8,6 @@ import { PluginConnectionIndicator } from "./components/plugin-connection-indica
 import Link from "next/link";
 
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
 
 export const metadata = {
   title: "VersatileTraining Hub",

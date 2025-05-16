@@ -131,7 +131,7 @@ export default function UserProfilePage() {
         ) : (
           <div className="bg-slate-50 rounded-lg p-8 text-center">
             <p className="text-slate-500">
-              {user.name ?? "This user"} hasn't published any training packs yet.
+              {user.name ?? "This user"} {`hasn't published any training packs yet.`}
             </p>
           </div>
         )}
