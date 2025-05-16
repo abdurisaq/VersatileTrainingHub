@@ -39,24 +39,24 @@ export default async function Home() {
       
       {latestPacks.items.length > 0 && (
         <div className="my-16 md:my-24"> 
-          <h2 className="text-3xl font-bold mb-8 text-center text-slate-800 dark:text-slate-200">Latest Training Packs</h2> 
+          <h2 className="text-3xl font-bold mb-8 text-center text-slate-800">Latest Training Packs</h2> 
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"> 
             {latestPacks.items.map((pack) => (
-              <div key={pack.id} className="bg-white dark:bg-dark-card rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 flex flex-col">
+              <div key={pack.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300 flex flex-col">
                 <Link href={`/training-packs/${pack.id}`} className="group">
-                  <h3 className="text-2xl font-semibold text-brand-primary group-hover:text-brand-secondary group-hover:underline mb-2 dark:text-purple-400 dark:group-hover:text-purple-300">
+                  <h3 className="text-2xl font-semibold text-brand-primary group-hover:text-brand-secondary group-hover:underline mb-2">
                     {pack.name}
                   </h3>
                 </Link>
                 
-                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 mb-3">
-                  By <span className="font-medium text-slate-700 dark:text-slate-300">{pack.creator.name}</span> • {pack.totalShots} shots
+                <p className="text-sm text-slate-600 mt-1 mb-3">
+                  By <span className="font-medium text-black">{pack.creator.name}</span> • {pack.totalShots} shots
                 </p>
                 
                 <div className="mt-auto pt-3 flex flex-wrap gap-2"> 
                   {pack.tags?.slice(0, 3).map((tag) => (
-                    <span key={tag} className="text-xs bg-neutral-medium dark:bg-slate-700 text-neutral-dark dark:text-slate-300 px-3 py-1 rounded-full font-medium">
+                    <span key={tag} className="text-xs bg-slate-800 text-white px-3 py-1 rounded-full font-medium border border-slate-700">
                       {tag}
                     </span>
                   ))}
