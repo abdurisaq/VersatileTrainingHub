@@ -120,7 +120,7 @@ function decodeTrainingPack(base64String: string): DecodedTrainingPack | null {
     const NAME_LEN_BITS = 5;
     const NUM_SHOTS_BITS = 6;
     const BOOST_MIN_BITS = 7;
-    const VELOCITY_MIN_BITS = 13; // For scalar starting velocity & goal blocker components
+    const VELOCITY_MIN_BITS = 12; 
     const GOAL_MIN_BITS = 12;
     const MAX_LINEAR_MAG_BITS = 12; // For extended linear velocity vector
     const MAX_ANGULAR_MAG_BITS = 8; // For extended angular velocity vector
