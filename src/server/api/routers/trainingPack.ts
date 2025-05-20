@@ -76,7 +76,7 @@ export const trainingPackRouter = createTRPCRouter({
       const pack = await ctx.db.trainingPack.findUnique({
         where: { id: input.id },
         select: {
-          // ... (all your existing selects for pack details)
+          
           id: true,
           name: true,
           description: true,
@@ -474,6 +474,7 @@ export const trainingPackRouter = createTRPCRouter({
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
+          code: true,
           name: true,
           description: true,
           totalShots: true,

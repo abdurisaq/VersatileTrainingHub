@@ -36,23 +36,31 @@ export default function UploadTrainingPackPage() {
     visibility: "PUBLIC",
   });
 
-  const { isConnected, getLocalPacks } = usePluginConnection({
+  
+  const { isConnected, getNewLocalPacks } = usePluginConnection({
     port: 7437,
     authToken: "versatile_training_scanner_token",
   });
 
-  useEffect(() => {
-    const loadLocalPacks = async () => {
-      if (isConnected) {
-        const packs = await getLocalPacks();
-        if (packs) {
-          setLocalPacks(packs);
-        }
-      }
-    };
+const { data: userPacks } = api.trainingPack.getUserPacks.useQuery();
 
-    void loadLocalPacks();
-  }, [isConnected, getLocalPacks]);
+useEffect(() => {
+  const loadLocalPacks = async () => {
+    if (isConnected && userPacks) {
+      
+      const packsWithCodes = userPacks
+        .filter(pack => pack.code !== null && pack.code !== undefined)
+        .map(pack => ({ code: pack.code! })); 
+        
+      const newPacks = await getNewLocalPacks(packsWithCodes);
+      if (newPacks) {
+        setLocalPacks(newPacks);
+      }
+    }
+  };
+
+  void loadLocalPacks();
+}, [isConnected, getNewLocalPacks, userPacks]);
 
   const createTrainingPack = api.trainingPack.create.useMutation({
     onSuccess: (data) => {

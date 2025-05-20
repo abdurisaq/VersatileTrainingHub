@@ -19,6 +19,7 @@ interface PluginConnection {
   sendTrainingPack: (packData: Record<string, unknown>) => Promise<boolean>;
   status: 'scanning' | 'connected' | 'disconnected';
   getLocalPacks: () => Promise<LocalPack[] | null>;
+  getNewLocalPacks: (dbPacks: { code: string }[]) => Promise<LocalPack[] | null>;
 }
 
 export function usePluginConnection({
@@ -126,6 +127,9 @@ export function usePluginConnection({
     };
   }, [checkPort, isConnected, onConnect, onDisconnect, scanInterval]);
 
+
+  
+
   const getLocalPacks = useCallback(async (): Promise<LocalPack[] | null> => {
     if (!isConnected) return null;
 
@@ -150,10 +154,23 @@ export function usePluginConnection({
     }
   }, [isConnected, port, authToken]);
   
+
+  const getNewLocalPacks = useCallback(async (dbPacks: { code: string }[]): Promise<LocalPack[] | null> => {
+  const localPacks = await getLocalPacks();
+  if (!localPacks) return null;
+
+  const dbPackCodes = new Set(dbPacks
+    .map(pack => pack.code)
+    .filter((code): code is string => !!code));
+
+  return localPacks.filter(localPack => !dbPackCodes.has(localPack.id));
+}, [getLocalPacks]);
+  
   return {
     isConnected,
     sendTrainingPack,
     status,
     getLocalPacks,
+    getNewLocalPacks,
   };
 }
