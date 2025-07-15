@@ -179,15 +179,3 @@ The application will be available at [http://localhost:3000](http://localhost:30
 
 *   **tRPC:** Primary API for client-server data fetching and mutations, defined in `src/server/api/routers/`.
 *   **Plugin Upload:** `POST /api/plugin/upload` - HTTP endpoint for the BakkesMod plugin to upload training pack data. Requires authentication.
-
-## Contributing
-
-Contributions are welcome. Please follow standard fork-and-pull-request workflow:
-1.  Fork the repository.
-2.  Create a feature or bugfix branch.
-3.  Commit your changes with clear messages.
-4.  Push to your fork and open a Pull Request.
-
-## License
-
-This project is licensed under the MIT License. (Create a `LICENSE.md` file with the MIT License text if one doesn't exist).
