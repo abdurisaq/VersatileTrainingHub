@@ -48,7 +48,7 @@ async function NavBar() {
               <Link href="/api/auth/signin" className="hover:text-brand-accent py-2 px-3 rounded-md transition-colors dark:hover:text-yellow-400">
                 Sign In
               </Link>
-              <Link href="/api/auth/signup" className="px-4 py-2 bg-brand-primary hover:bg-brand-secondary text-white rounded-md font-medium transition-colors dark:bg-purple-600 dark:hover:bg-purple-700">
+              <Link href="/auth/signup" className="px-4 py-2 bg-brand-primary hover:bg-brand-secondary text-white rounded-md font-medium transition-colors dark:bg-purple-600 dark:hover:bg-purple-700">
                 Sign Up
               </Link>
             </div>
